@@ -507,14 +507,16 @@ function downloadCSV(name, rows) {
 
 /* ---------- Yönlendirme ---------- */
 function route() {
+  fieldGeneration++;
   const h = location.hash.replace(/^#\/?/, "") || "genel";
   const [p, arg] = h.split("/");
   const tab = p === "sinav" ? "sinavlar" : p;
   $$("nav.tabs a").forEach(a => a.classList.toggle("active", a.dataset.tab === tab));
-  const views = { duellosoru: vDuelQuestions, duelloodul: vDuelRewards, belgeler: vBelgeler, gecmis: vIslemGecmisi, genel: vGenel, kullanicilar: vKullanicilar, hekimler: vHekimler, urunler: vUrunler, sinavlar: vSinavlar, mufredat: vMufredat, saha: vSaha, duyurular: vDuyurular, sinav: () => vSinavEdit(arg) };
+  const views = { sahacalisma: () => vField("manage"), beceri: vFieldHeatmap, duellosoru: vDuelQuestions, duelloodul: vDuelRewards, belgeler: vBelgeler, gecmis: vIslemGecmisi, genel: vGenel, kullanicilar: vKullanicilar, hekimler: vHekimler, urunler: vUrunler, sinavlar: vSinavlar, mufredat: vMufredat, saha: vSaha, duyurular: vDuyurular, sinav: () => vSinavEdit(arg) };
   (views[p] || vGenel)();
 }
 window.addEventListener("hashchange", () => { if (ME && ME.role === "admin") { route(); window.scrollTo(0, 0); } });
 boot(async () => { await loadAll(); $("nav.tabs").hidden = false; route(); }, { adminOnly: true });
+
 
 

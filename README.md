@@ -155,3 +155,25 @@ PJP menüsündeki **Hekim simülasyonu**: ürün ve hekim karakteri seçimi, Tü
 Mevcut `ai` Edge Function kullanılır; yeni SQL kurulumu gerekmez. Etkin hesap, atanmış ürün ve çalışan AI servisi gerekir. Tıbbi iddialar `search_sources` üzerinden erişilebilir onaylı belgelerle incelenir. Kaynak yoksa doğruluk doğrulanmış sayılmaz. İletişim ve itiraz karşılama puanları metne dayalı eğitim geri bildirimidir. Ses tonu / akustik analiz ve gerçek zamanlı otomatik söz kesme bu sürümde yoktur; hekimin sesli yanıtı düğmeyle kesilebilir.
 
 Kontrol: `node tests/roleplay.test.cjs`.
+
+## Saha çalışma merkezi (v6)
+
+Sekiz geliştirme aynı modülde birleşir: yazılı itiraz kartları ve isteğe bağlı kaynaklı AI geri bildirimi; seçimlere göre dallanan hekim görüşmeleri; hatalı sunum alıştırmaları; kaynaklı ürün karşılaştırmaları; uzmanlığa göre üç mesaj/üç soruluk ziyaret hazırlık kartları; kişisel gelişim rotası; belge değişikliği bildirimleri ve kontrol çalışmaları; ürün bazında ekip beceri haritası.
+
+### Mevcut projeyi etkinleştirme
+
+Supabase **SQL Editor** içinde `supabase/field_training_v6.sql` dosyasının tamamını çalıştırın. Önce `features_v3.sql` uygulanmış olmalıdır. Yeni dosya kendi işlemini açar ve başarıyla bitince tamamlar; tekrar uygulanabilir. Tarayıcı ekranlarının yayını tek başına veritabanı kurulumunu tamamlamaz. Bu sürüm canlı Supabase yönetim bağlantısı olmadan geliştirildi; migration canlı projeye otomatik uygulanmadı.
+
+1. Ürün Müdürüne yönetici panelinden ürün atayın. Kaynak belgeleri bölümüne güncel ürün/rakip materyallerini sayfalarıyla ekleyip onaylatın.
+2. Ürün Müdürü **İçerik atölyesi** bölümünde tür, ürün, uzmanlık, hedef beceri, içerik ve kaynak sayfalarını seçer. Alıştırma adımlarına seçenek, puan ve açıklama girer. Dallanan görüşmelerde sonraki adımı seçer; diğer türlerde adımlar sırayla tamamlanır.
+3. Taslağı hukuk incelemesine gönderin. Avukat veya Yönetici içerik, kaynak ve cevap/puan anahtarını inceler; onaylar ya da gerekçeyle reddeder. Ürün Müdürü yönetici değilse kendi içeriğini onaylayamaz. Ayrı medikal onay rolü yoktur; kurumunuzun medikal kontrolünü ayrıca yürütün.
+4. PJP yalnızca kendisine atanmış ürünlerdeki onaylı, güncel kaynaklı çalışmaları görür. Sonuçlar ve içerik sürümü sunucuda saklanır. Puan önceden onaylanan seçenek anahtarından hesaplanır; yazılı AI koçluğu puana dahil edilmez.
+5. **Gelişim rotam**, son beş puanlı çalışmada 70 altındaki becerileri, sınav hatalarının tedavi alanlarını ve yeni içerik sürümlerini önceliklendirir. Okuma kartları beceri ortalamasına dahil edilmez.
+6. Yeni belge onayları **Ürün değişiklikleri** ekranında eklenen/değişen/kaldırılan sayfaları gösterir. Yönetici ilgili **Ürün güncellemeleri** türünde kontrol soruları hazırlar. Bildirim ve “okudum” kayıtları modül etkinleştikten sonra oluşur.
+7. **Beceri haritası** yöneticinin ürünlerindeki PJP/beceri sonuçlarını, deneme sayısını ve CSV çıktısını gösterir. Çalışma puanı satış sonucu veya çalışan performans değerlendirmesi değildir.
+
+Kaynak sayfasının metni değişirse o sayfaya bağlı çalışmalar PJP ekranından kapanır; güncel kaynağı seçip yeniden onaylatın. İçerik düzenlenirse taslağa döner. Devam eden eski sürüm tamamlanamaz; tamamlanan eski sonuçlar korunur. Gerçek şirket tıbbi materyalleri olmadan örnek klinik iddia veya hazır onaylı içerik eklenmedi.
+
+### Kontroller
+
+`npm install` ve `npm run test:field`. Veritabanı testleri PGlite ile izole PostgreSQL üzerinde çalışır; canlı Supabase projesine bağlanmaz. Yetki izolasyonu, hukuk onayı, altı içerik türü, kaynak değişikliği, sunucuda puanlama, eski cevap anahtarlarının saklanması ve okundu kayıtları doğrulanır. Mevcut testler ayrıca `node tests/features.test.cjs` ve `node tests/roleplay.test.cjs` ile çalışır.

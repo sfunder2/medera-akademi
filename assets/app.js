@@ -493,10 +493,13 @@ function navItems() {
   items.push(["portal", "Sınavlarım"], ["mufredat", "Müfredat"], ["ogrenme", "Öğrenme planım"], ["belgeler", "Kaynak belgeleri"]);
   if (r === "pjp") items.push(["paydaslar", "Paydaşlar"], ["duello", "Düellolar"], ["roleplay", "Hekim simülasyonu"]);
   if (r === "avukat") items.push(["duellosoru", "Düello soruları"]);
-  if (r === "urun_muduru") items.push(["ekip", "Ekip raporu"]);
+  if (r === "urun_muduru") items.push(["ekip", "Ekip raporu"], ["beceri", "Beceri haritası"]);
+  items.push(["sahacalisma", "Saha çalışmaları"], ["gelisim", "Gelişim rotam"], ["degisiklik", "Ürün değişiklikleri"]);
+  if (fieldManager() || fieldReviewer()) items.push(["atolye", "İçerik atölyesi"]);
   return items;
 }
 function route() {
+  fieldGeneration++;
   if (window.stopRoleplay) window.stopRoleplay();
   const h = location.hash.replace(/^#\/?/, "") || "portal";
   const [p, arg] = h.split("/");
@@ -504,11 +507,12 @@ function route() {
   const page = allowed.includes(p) ? p : "portal";
   const tab = ["egitim", "kutuphane", "sinav"].includes(page) ? "portal" : page;
   $("#nav").innerHTML = navItems().map(([k, l]) => `<a href="#/${k}" class="${k === tab ? "active" : ""}">${l}</a>`).join("");
-  const views = { duello: vDuello, duellosoru: vDuelQuestions, ogrenme: vOgrenme, belgeler: vBelgeler, portal: vPortal, egitim: vEgitim, kutuphane: vKutuphane, mufredat: vMufredat, paydaslar: vPaydaslar, ekip: vEkip, inceleme: vInceleme, profil: vProfil, sinav: () => vSinav(arg) };
+  const views = { sahacalisma: vField, gelisim: () => vField("plan"), degisiklik: vFieldNotices, atolye: () => vField("manage"), beceri: vFieldHeatmap, duello: vDuello, duellosoru: vDuelQuestions, ogrenme: vOgrenme, belgeler: vBelgeler, portal: vPortal, egitim: vEgitim, kutuphane: vKutuphane, mufredat: vMufredat, paydaslar: vPaydaslar, ekip: vEkip, inceleme: vInceleme, profil: vProfil, sinav: () => vSinav(arg) };
   if (page === "roleplay") vRoleplay(); else views[page]();
 }
 window.addEventListener("hashchange", () => { if (ME) { route(); window.scrollTo(0, 0); } });
 boot(async () => { await loadAll(); route(); });
+
 
 
 
