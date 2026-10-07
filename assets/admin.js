@@ -1,11 +1,11 @@
 /* Yönetim paneli */
 const app = $("#app");
-const A = { users: [], products: [], exams: [], asg: [], curricula: [], up: [], interactions: [], hcps: [] };
+const A = { users: [], products: [], exams: [], asg: [], curricula: [], up: [], interactions: [], hcps: [], anns: [] };
 const sub = {};
 let draft = null; // sınav düzenleyici durumu
 
 async function loadAll() {
-  const [u, p, e, a, c, up, i, h] = await Promise.all([
+  const [u, p, e, a, c, up, i, h, an] = await Promise.all([
     sb.from("profiles").select("*").order("created_at"),
     sb.from("products").select("*").order("name"),
     sb.from("exams").select("*").eq("is_practice", false).order("created_at", { ascending: false }),
@@ -13,14 +13,21 @@ async function loadAll() {
     sb.from("curricula").select("*, products(name)").order("created_at", { ascending: false }),
     sb.from("user_products").select("*"),
     sb.from("interactions").select("*, products(name)").order("date", { ascending: false }).limit(2000),
-    sb.from("hcps").select("*")
+    sb.from("hcps").select("*").order("name"),
+    sb.from("announcements").select("*").order("created_at", { ascending: false })
   ]);
-  [u, p, e, a, c, up, i, h].forEach(r => r.error && console.error(r.error));
+  [u, p, e, a, c, up, i, h, an].forEach(r => r.error && console.error(r.error));
+  A.anns = an.data || [];
   A.users = u.data || []; A.products = p.data || []; A.exams = e.data || [];
   const examIds = new Set(A.exams.map(x => x.id));
   A.asg = (a.data || []).filter(x => examIds.has(x.exam_id));
   A.curricula = c.data || []; A.up = up.data || []; A.interactions = i.data || []; A.hcps = h.data || [];
+  const pend = A.users.filter(x => x.status === "pending").length, b = $("#pendingBadge");
+  if (b) { b.hidden = !pend; b.textContent = pend; }
 }
+const activeUsers = () => A.users.filter(u => u.status === "active");
+const STATUS_LABEL = { pending: "Onay bekliyor", active: "Etkin", disabled: "Devre dışı" };
+const STATUS_PILL = { pending: "wait", active: "ok", disabled: "bad" };
 const userName = id => { const u = A.users.find(x => x.id === id); return u ? (u.full_name || u.email) : "—"; };
 const examStats = id => {
   const list = A.asg.filter(a => a.exam_id === id), done = list.filter(a => a.status === "done");
@@ -35,12 +42,20 @@ function vGenel() {
   const comp = A.asg.length ? Math.round(done.length / A.asg.length * 100) : 0;
   const today = new Date().toISOString().slice(0, 10);
   const late = A.asg.filter(a => a.status === "pending" && a.due_date && a.due_date < today);
+  const pendingUsers = A.users.filter(u => u.status === "pending");
+  const inReview = A.exams.filter(e => e.review_status === "in_review").length + A.curricula.filter(c => c.review_status === "in_review").length;
   const recent = done.slice().sort((x, y) => (y.completed_at || "").localeCompare(x.completed_at || "")).slice(0, 8);
   const exam = id => A.exams.find(e => e.id === id)?.title || "—";
   app.innerHTML = `
   <div class="page-head"><div class="grow"><h1>Genel bakış</h1><p class="muted">Ekibin eğitim durumu ve saha aktivitesi.</p></div></div>
-  ${strip([[A.users.length, "Kullanıcı"], [A.exams.length, "Sınav"], [A.asg.length - done.length, "Bekleyen atama", "amber"], ["%" + comp, "Tamamlama", "brandc", comp]])}
-  ${strip([[avg, "Ortalama puan"], ["%" + pass, "Başarı oranı (≥70)"], [A.products.length, "Ürün"], [A.interactions.length, "Kayıtlı etkileşim"]], "quiet")}
+  ${strip([[activeUsers().length, "Etkin kullanıcı"], [A.exams.length, "Sınav"], [A.asg.length - done.length, "Bekleyen atama", "amber"], ["%" + comp, "Tamamlama", "brandc", comp]])}
+  ${strip([[avg, "Ortalama puan"], ["%" + pass, "Başarı oranı (≥70)"], [A.hcps.length, "Kayıtlı hekim"], [A.interactions.length, "Kayıtlı etkileşim"]], "quiet")}
+  ${pendingUsers.length || inReview ? `<div class="panel" style="margin-bottom:16px"><h2>Bekleyen işler</h2><div class="list" style="margin-top:6px">
+    ${pendingUsers.length ? `<div class="item"><div class="grow"><h3>${pendingUsers.length} kullanıcı onay bekliyor</h3><p class="muted small">${pendingUsers.slice(0, 4).map(u => esc(u.full_name || u.email) + " (" + roleLabel(u.job_role) + ")").join(", ")}</p></div><a class="btn sm" href="#/kullanicilar">İncele</a></div>` : ""}
+    ${inReview ? `<div class="item"><div class="grow"><h3>${inReview} içerik hukuk incelemesinde</h3><p class="muted small">Avukat rolündeki kullanıcıların onayı bekleniyor.</p></div></div>` : ""}
+  </div></div>` : ""}
+  <div class="panel" style="margin-bottom:16px"><h2 style="margin-bottom:12px">Rol dağılımı (etkin)</h2>
+    ${strip(Object.entries(JOB_ROLES).map(([k, v]) => [activeUsers().filter(u => u.job_role === k).length, v]).concat([[A.users.filter(u => u.role === "admin").length, "Yönetici"]]), "quiet")}</div>
   <div class="grid2">
     <div class="panel"><h2>Son tamamlananlar</h2>
       ${recent.length ? `<div class="list" style="margin-top:8px">${recent.map(a => `<div class="item"><div class="grow"><h3>${esc(userName(a.user_id))}</h3>
@@ -55,35 +70,124 @@ function vGenel() {
 
 /* ---------- Kullanıcılar ---------- */
 function vKullanicilar() {
-  const q = (sub.uq || "").toLocaleLowerCase("tr");
-  const list = A.users.filter(u => !q || ((u.full_name || "") + " " + (u.email || "")).toLocaleLowerCase("tr").includes(q));
+  const q = (sub.uq || "").toLocaleLowerCase("tr"), fs = sub.us ?? (A.users.some(u => u.status === "pending") ? "pending" : ""), fr = sub.ur || "";
+  const list = A.users.filter(u => (!q || ((u.full_name || "") + " " + (u.email || "")).toLocaleLowerCase("tr").includes(q)) && (!fs || u.status === fs) && (!fr || u.job_role === fr));
+  const cnt = st => A.users.filter(u => !st || u.status === st).length;
   app.innerHTML = `
   <div class="page-head"><div class="grow"><h1>Kullanıcılar</h1>
-    <p class="muted">Yeni kullanıcılar giriş sayfasından e-postalarıyla bir kez giriş yaptığında burada görünür.</p></div>
-    <input type="search" id="uq" placeholder="İsim veya e-posta ara…" value="${esc(sub.uq || "")}" style="max-width:280px"></div>
+    <p class="muted">Kayıt olan kullanıcılar onayınızdan sonra içeriğe erişir. Rolü kullanıcı seçer; gerekirse buradan düzeltin.</p></div>
+    <input type="search" id="uq" placeholder="İsim veya e-posta ara…" value="${esc(sub.uq || "")}" style="max-width:240px">
+    <select id="ur" class="auto"><option value="">Tüm roller</option>${Object.entries(JOB_ROLES).map(([k, v]) => `<option value="${k}" ${fr === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+  <div class="seg">
+    <button data-us="pending" class="${fs === "pending" ? "on" : ""}">Onay bekleyen <span class="n">${cnt("pending")}</span></button>
+    <button data-us="active" class="${fs === "active" ? "on" : ""}">Etkin <span class="n">${cnt("active")}</span></button>
+    <button data-us="disabled" class="${fs === "disabled" ? "on" : ""}">Devre dışı <span class="n">${cnt("disabled")}</span></button>
+    <button data-us="" class="${fs === "" ? "on" : ""}">Tümü <span class="n">${cnt("")}</span></button>
+  </div>
   <div class="panel"><div class="tablewrap"><table class="t">
-    <thead><tr><th>Kullanıcı</th><th>Rol</th><th>Ürünler</th><th>Sınavlar</th><th>Ort. puan</th><th>Etkileşim</th><th></th></tr></thead>
+    <thead><tr><th>Kullanıcı</th><th>Rol</th><th>Durum</th><th>Ürünler</th><th>Sınav</th><th>Ort.</th><th>Hekim / etkileşim</th><th></th></tr></thead>
     <tbody>${list.map(u => {
       const asg = A.asg.filter(a => a.user_id === u.id), done = asg.filter(a => a.status === "done");
       const avg = done.length ? Math.round(done.reduce((t, a) => t + a.score, 0) / done.length) : null;
       const prods = A.up.filter(x => x.user_id === u.id).map(x => A.products.find(p => p.id === x.product_id)?.name).filter(Boolean);
-      return `<tr><td><b>${esc(u.full_name || "—")}</b><br><span class="muted small">${esc(u.email)}</span></td>
-        <td><span class="pill ${u.role === "admin" ? "ok" : ""}">${u.role === "admin" ? "Yönetici" : "Kullanıcı"}</span></td>
+      const me = u.id === ME.id;
+      return `<tr><td><b>${esc(u.full_name || "—")}</b>${u.role === "admin" ? ' <span class="pill ok">Yönetici</span>' : ""}<br><span class="muted small">${esc(u.email)} · ${fmtDate(u.created_at)}</span></td>
+        <td><select class="auto" data-jr="${u.id}" aria-label="Rol">${Object.entries(JOB_ROLES).map(([k, v]) => `<option value="${k}" ${u.job_role === k ? "selected" : ""}>${v}</option>`).join("")}</select></td>
+        <td><span class="pill ${STATUS_PILL[u.status] || ""}">${STATUS_LABEL[u.status] || u.status}</span></td>
         <td class="small">${prods.length ? prods.map(esc).join(", ") : '<span class="muted">—</span>'}</td>
         <td>${done.length}/${asg.length}</td><td>${avg === null ? "—" : "%" + avg}</td>
-        <td>${A.interactions.filter(i => i.owner_id === u.id).length}</td>
+        <td>${A.hcps.filter(h => h.owner_id === u.id).length} / ${A.interactions.filter(i => i.owner_id === u.id).length}</td>
         <td><div class="row" style="flex-wrap:nowrap">
+          ${u.status === "pending" ? `<button class="btn sm" data-st="${u.id}" data-to="active">Onayla</button><button class="btn danger sm" data-st="${u.id}" data-to="disabled">Reddet</button>` : ""}
+          ${u.status === "active" && !me ? `<button class="btn danger sm" data-st="${u.id}" data-to="disabled">Devre dışı bırak</button>` : ""}
+          ${u.status === "disabled" ? `<button class="btn ghost sm" data-st="${u.id}" data-to="active">Etkinleştir</button>` : ""}
           <button class="btn ghost sm" data-ap="${u.id}">Ürün ata</button>
-          ${u.id === ME.id ? "" : `<button class="btn ghost sm" data-role="${u.id}" data-to="${u.role === "admin" ? "user" : "admin"}">${u.role === "admin" ? "Yöneticiliği kaldır" : "Yönetici yap"}</button>`}
+          ${me ? "" : `<button class="btn ghost sm" data-role="${u.id}" data-to="${u.role === "admin" ? "user" : "admin"}">${u.role === "admin" ? "Yöneticiliği kaldır" : "Yönetici yap"}</button>`}
         </div></td></tr>`;
-    }).join("") || `<tr><td colspan="7" class="muted">Kullanıcı bulunamadı.</td></tr>`}</tbody></table></div></div>`;
+    }).join("") || `<tr><td colspan="8" class="muted">Bu filtreye uyan kullanıcı yok.</td></tr>`}</tbody></table></div></div>`;
   $("#uq").oninput = e => { sub.uq = e.target.value; vKullanicilar(); const n = $("#uq"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); };
+  $("#ur").onchange = e => { sub.ur = e.target.value; vKullanicilar(); };
+  $$("[data-us]").forEach(b => b.onclick = () => { sub.us = b.dataset.us; vKullanicilar(); });
+  $$("[data-jr]").forEach(sel => sel.onchange = async () => {
+    check(await sb.rpc("admin_set_job_role", { p_user: sel.dataset.jr, p_job_role: sel.value })); toast("Rol güncellendi"); await loadAll(); vKullanicilar();
+  });
+  $$("[data-st]").forEach(b => b.onclick = async () => {
+    const to = b.dataset.to, msg = { active: "Kullanıcı etkinleştirilsin mi?", disabled: "Kullanıcının erişimi kapatılsın mı?" }[to];
+    if (!confirm(msg)) return;
+    check(await sb.rpc("admin_set_status", { p_user: b.dataset.st, p_status: to }));
+    toast(to === "active" ? "Kullanıcı etkinleştirildi" : "Erişim kapatıldı"); await loadAll(); vKullanicilar();
+  });
   $$("[data-role]").forEach(b => b.onclick = async () => {
     if (!confirm(b.dataset.to === "admin" ? "Bu kullanıcı yönetici yapılsın mı?" : "Yönetici yetkisi kaldırılsın mı?")) return;
-    check(await sb.rpc("admin_set_role", { p_user: b.dataset.role, p_role: b.dataset.to })); toast("Rol güncellendi"); await loadAll(); vKullanicilar();
+    check(await sb.rpc("admin_set_role", { p_user: b.dataset.role, p_role: b.dataset.to })); toast("Yetki güncellendi"); await loadAll(); vKullanicilar();
   });
   $$("[data-ap]").forEach(b => b.onclick = () => assignProductsDialog(b.dataset.ap));
 }
+
+/* ---------- Hekimler ---------- */
+function vHekimler() {
+  const q = (sub.hq || "").toLocaleLowerCase("tr"), fo = sub.ho || "", fc = sub.hc || "", fsp = sub.hs || "";
+  const cities = [...new Set(A.hcps.map(h => h.city).filter(Boolean))].sort((a, b) => a.localeCompare(b, "tr"));
+  const specs = [...new Set(A.hcps.map(h => h.spec).filter(Boolean))].sort((a, b) => a.localeCompare(b, "tr"));
+  const owners = A.users.filter(u => A.hcps.some(h => h.owner_id === u.id));
+  const list = A.hcps.filter(h => (!q || (h.name + " " + (h.inst || "")).toLocaleLowerCase("tr").includes(q)) && (!fo || h.owner_id === fo) && (!fc || h.city === fc) && (!fsp || h.spec === fsp));
+  const stats = h => { const ii = A.interactions.filter(i => i.hcp_id === h.id); return { n: ii.length, last: ii.map(i => i.date).filter(Boolean).sort().pop() }; };
+  const key = h => (h.name || "").toLocaleLowerCase("tr").replace(/^dr\.?\s*/, "").trim() + "|" + (h.inst || "").toLocaleLowerCase("tr").trim();
+  const dupCount = {}; A.hcps.forEach(h => { dupCount[key(h)] = (dupCount[key(h)] || 0) + 1; });
+  const shared = Object.values(dupCount).filter(n => n > 1).length;
+  app.innerHTML = `
+  <div class="page-head"><div class="grow"><h1>Hekimler</h1><p class="muted">Tüm temsilcilerin kaydettiği hekimler (salt okunur). Kişisel veri içerir; dışa aktarırken dikkatli olun.</p></div>
+    <button class="btn ghost" id="csv" ${list.length ? "" : "disabled"}>CSV indir</button></div>
+  ${strip([[A.hcps.length, "Kayıtlı hekim"], [Object.keys(dupCount).length, "Tekil hekim (ad + kurum)"], [shared, "Birden fazla temsilcide", "amber"], [cities.length, "Şehir"]], "quiet")}
+  <div class="panel">
+    <div class="row" style="margin-bottom:8px">
+      <input type="search" id="hq" placeholder="İsim veya kurum ara…" value="${esc(sub.hq || "")}" style="flex:1;min-width:200px">
+      <select id="ho" class="auto"><option value="">Tüm temsilciler</option>${owners.map(u => `<option value="${u.id}" ${fo === u.id ? "selected" : ""}>${esc(u.full_name || u.email)}</option>`).join("")}</select>
+      <select id="hs" class="auto"><option value="">Tüm uzmanlıklar</option>${specs.map(x => `<option ${fsp === x ? "selected" : ""}>${esc(x)}</option>`).join("")}</select>
+      <select id="hc" class="auto"><option value="">Tüm şehirler</option>${cities.map(x => `<option ${fc === x ? "selected" : ""}>${esc(x)}</option>`).join("")}</select></div>
+    ${list.length ? `<div class="tablewrap"><table class="t"><thead><tr><th>Hekim</th><th>Uzmanlık</th><th>Kurum</th><th>Şehir</th><th>Temsilci</th><th>Etkileşim</th><th>Son</th></tr></thead><tbody>
+      ${list.map(h => { const s = stats(h); return `<tr><td><b>${esc(h.name)}</b>${dupCount[key(h)] > 1 ? ` <span class="pill wait" title="Birden fazla temsilci bu hekimi kaydetmiş">${dupCount[key(h)]} temsilci</span>` : ""}</td>
+        <td class="small">${esc(h.spec || "")}</td><td class="small">${esc(h.inst || "")}</td><td class="small">${esc(h.city || "")}</td>
+        <td class="small">${esc(userName(h.owner_id))}</td><td>${s.n}</td><td class="small">${fmtDate(s.last)}</td></tr>`; }).join("")}
+    </tbody></table></div>` : `<div class="empty"><div class="ic">${icon.user}</div><h3>Hekim bulunamadı</h3><p>${A.hcps.length ? "Filtreleri değiştirin." : "PJP'ler Paydaşlar sekmesinden hekim eklediğinde burada görünür."}</p></div>`}
+  </div>`;
+  $("#hq").oninput = e => { sub.hq = e.target.value; vHekimler(); const n = $("#hq"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); };
+  $("#ho").onchange = e => { sub.ho = e.target.value; vHekimler(); };
+  $("#hs").onchange = e => { sub.hs = e.target.value; vHekimler(); };
+  $("#hc").onchange = e => { sub.hc = e.target.value; vHekimler(); };
+  $("#csv").onclick = () => downloadCSV("hekimler.csv", [["Hekim", "Uzmanlık", "Kurum", "Şehir", "Temsilci", "Etkileşim", "Son etkileşim"],
+    ...list.map(h => { const s = stats(h); return [h.name, h.spec || "", h.inst || "", h.city || "", userName(h.owner_id), s.n, s.last || ""]; })]);
+}
+
+/* ---------- Duyurular ---------- */
+function vDuyurular() {
+  app.innerHTML = `
+  <div class="page-head"><div class="grow"><h1>Duyurular</h1><p class="muted">Duyurular kullanıcıların ana sayfasında görünür. Belirli bir role hedefleyebilirsiniz.</p></div>
+    <button class="btn" id="newA">Duyuru yayımla</button></div>
+  <div class="panel">${A.anns.length ? `<div class="list">${A.anns.map(a => `<div class="item" style="align-items:flex-start">
+    <div class="grow"><h3>${a.pinned ? "📌 " : ""}${esc(a.title)}</h3><p class="muted small">${fmtDate(a.created_at)} · ${a.target_role ? roleLabel(a.target_role) + " rolüne" : "Herkese"}</p>
+    ${a.body ? `<p style="font-size:14px;margin-top:6px;white-space:pre-wrap">${esc(a.body)}</p>` : ""}</div>
+    <button class="btn ghost sm" data-pin="${a.id}" data-v="${a.pinned ? 0 : 1}">${a.pinned ? "Sabitlemeyi kaldır" : "Sabitle"}</button>
+    <button class="btn danger sm" data-ad="${a.id}">Sil</button></div>`).join("")}</div>`
+  : `<div class="empty"><div class="ic">${icon.book}</div><h3>Henüz duyuru yok</h3><p>Yeni sınavlar, eğitim takvimi veya önemli güncellemeler için duyuru yayımlayın.</p></div>`}</div>`;
+  $("#newA").onclick = () => {
+    const d = dialog(`<h2>Duyuru yayımla</h2>
+      <div class="field"><label for="at">Başlık</label><input type="text" id="at"></div>
+      <div class="field"><label for="ab">Metin</label><textarea id="ab" rows="5"></textarea></div>
+      <div class="field"><label for="ar">Kime</label><select id="ar"><option value="">Herkese</option>${Object.entries(JOB_ROLES).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></div>
+      <label class="check"><input type="checkbox" id="ap"><span>Üstte sabitle</span></label>
+      <div class="row end" style="margin-top:14px"><button class="btn ghost" id="x">Vazgeç</button><button class="btn" id="s">Yayımla</button></div>`);
+    $("#x", d).onclick = () => d.remove();
+    $("#s", d).onclick = async () => {
+      const title = $("#at", d).value.trim(); if (!title) { $("#at", d).focus(); return; }
+      check(await sb.from("announcements").insert({ title, body: $("#ab", d).value.trim() || null, target_role: $("#ar", d).value || null, pinned: $("#ap", d).checked, created_by: ME.id }));
+      d.remove(); toast("Duyuru yayımlandı"); await loadAll(); vDuyurular();
+    };
+  };
+  $$("[data-pin]").forEach(b => b.onclick = async () => { check(await sb.from("announcements").update({ pinned: b.dataset.v === "1" }).eq("id", b.dataset.pin)); await loadAll(); vDuyurular(); });
+  $$("[data-ad]").forEach(b => b.onclick = async () => { if (!confirm("Duyuru silinsin mi?")) return; check(await sb.from("announcements").delete().eq("id", b.dataset.ad)); await loadAll(); vDuyurular(); });
+}
+
 function assignProductsDialog(uid) {
   if (!A.products.length) { toast("Önce Ürünler sekmesinden ürün ekleyin"); return; }
   const have = new Set(A.up.filter(x => x.user_id === uid).map(x => x.product_id));
@@ -138,18 +242,24 @@ function productDialog(p = {}) {
 /* ---------- Sınavlar ---------- */
 function vSinavlar() {
   app.innerHTML = `
-  <div class="page-head"><div class="grow"><h1>Sınavlar</h1><p class="muted">Sınav oluşturun, düzenleyin, kullanıcılara atayın ve sonuçları izleyin.</p></div>
+  <div class="page-head"><div class="grow"><h1>Sınavlar</h1><p class="muted">Sınav oluşturun, hukuk incelemesine gönderin, onaylananları atayın ve sonuçları izleyin. Onaylı bir sınavı düzenlerseniz yeniden onay gerekir.</p></div>
     <button class="btn" id="newE">Yeni sınav</button></div>
   <div class="panel">${A.exams.length ? `<div class="list">${A.exams.map(e => {
     const s = examStats(e.id);
     return `<div class="item"><div class="grow"><h3>${esc(e.title)}</h3>
-      <p class="muted small">${esc(e.area || "Genel")} · ${e.questions.length} soru · ${s.done}/${s.n} tamamlandı${s.done ? ` · ort. %${s.avg}` : ""}</p></div>
-      <button class="btn sm" data-as="${e.id}">Ata</button><button class="btn ghost sm" data-rs="${e.id}">Sonuçlar</button>
+      <p class="muted small">${esc(e.area || "Genel")} · ${e.questions.length} soru · ${s.done}/${s.n} tamamlandı${s.done ? ` · ort. %${s.avg}` : ""}</p>
+      ${e.review_status === "rejected" && e.review_note ? `<p class="small" style="color:var(--red);margin-top:4px">Ret gerekçesi: ${esc(e.review_note)}</p>` : ""}</div>
+      ${reviewPill(e.review_status)}
+      ${e.review_status === "draft" || e.review_status === "rejected" ? `<button class="btn ghost sm" data-send="${e.id}">İncelemeye gönder</button>` : ""}
+      <button class="btn sm" data-as="${e.id}" ${e.review_status === "approved" ? "" : 'disabled title="Önce hukuk onayı gerekli"'}>Ata</button><button class="btn ghost sm" data-rs="${e.id}">Sonuçlar</button>
       <button class="btn ghost sm" data-ed="${e.id}">Düzenle</button><button class="btn danger sm" data-dl="${e.id}">Sil</button></div>`;
   }).join("")}</div>`
   : `<div class="empty"><div class="ic">${icon.folder}</div><h3>Henüz sınav yok</h3><p>Yapay zekâyla taslak oluşturun ya da soruları kendiniz yazın.</p></div>`}</div>`;
   $("#newE").onclick = newExamDialog;
   $$("[data-as]").forEach(b => b.onclick = () => assignDialog(b.dataset.as));
+  $$("[data-send]").forEach(b => b.onclick = async () => {
+    check(await sb.from("exams").update({ review_status: "in_review" }).eq("id", b.dataset.send)); toast("Hukuk incelemesine gönderildi"); await loadAll(); vSinavlar();
+  });
   $$("[data-rs]").forEach(b => b.onclick = () => resultsDialog(b.dataset.rs));
   $$("[data-ed]").forEach(b => b.onclick = () => location.hash = "#/sinav/" + b.dataset.ed);
   $$("[data-dl]").forEach(b => b.onclick = async () => {
@@ -253,11 +363,14 @@ function assignDialog(examId) {
   const already = new Set(A.asg.filter(a => a.exam_id === examId).map(a => a.user_id));
   const d = dialog(`<h2>Sınav ata — ${esc(ex.title)}</h2>
     <div class="field"><label for="due">Son tarih (isteğe bağlı)</label><input type="date" id="due"></div>
+    <div class="row" style="margin-bottom:6px"><span class="small" style="font-weight:600">Hızlı seç:</span>
+      ${Object.entries(JOB_ROLES).map(([k, v]) => `<button class="btn ghost sm" data-qr="${k}">Tüm ${v}</button>`).join("")}</div>
     <label class="check"><input type="checkbox" id="all"><b>Tümünü seç</b></label>
-    <div id="ul">${A.users.map(u => `<label class="check"><input type="checkbox" value="${u.id}" ${already.has(u.id) ? "checked disabled" : ""}>
-      <span>${esc(u.full_name || u.email)} <span class="muted small">${esc(u.email)}${already.has(u.id) ? " · zaten atandı" : ""}</span></span></label>`).join("")}</div>
+    <div id="ul">${activeUsers().map(u => `<label class="check"><input type="checkbox" value="${u.id}" ${already.has(u.id) ? "checked disabled" : ""}>
+      <span>${esc(u.full_name || u.email)} <span class="muted small">${roleLabel(u.job_role)} · ${esc(u.email)}${already.has(u.id) ? " · zaten atandı" : ""}</span></span></label>`).join("")}</div>
     <div class="row end" style="margin-top:14px"><button class="btn ghost" id="x">Vazgeç</button><button class="btn" id="s">Sınavı ata</button></div>`);
   $("#all", d).onchange = e => $$("#ul input:not([disabled])", d).forEach(i => i.checked = e.target.checked);
+  $$("[data-qr]", d).forEach(b => b.onclick = () => $$("#ul input:not([disabled])", d).forEach(i => { if (A.users.find(u => u.id === i.value)?.job_role === b.dataset.qr) i.checked = true; }));
   $("#x", d).onclick = () => d.remove();
   $("#s", d).onclick = async () => {
     const ids = $$("#ul input:checked:not([disabled])", d).map(i => i.value);
@@ -296,19 +409,24 @@ function resultsDialog(examId) {
 /* ---------- Müfredat ---------- */
 function vMufredat() {
   app.innerHTML = `
-  <div class="page-head"><div class="grow"><h1>Müfredat</h1><p class="muted">Taslak müfredatlar yalnızca yöneticilere görünür; yayımladığınızda tüm kullanıcılar görür.</p></div>
+  <div class="page-head"><div class="grow"><h1>Müfredat</h1><p class="muted">Akış: taslak → hukuk incelemesi → onay → yayın. Onaylı bir müfredatı düzenlerseniz yayından kalkar ve yeniden onay gerekir.</p></div>
     <button class="btn" id="newC">Müfredat oluştur</button></div>
   ${A.curricula.length ? A.curricula.map(c => `<div class="panel">
     <div class="row"><div class="grow"><h2>${esc(c.title)}</h2>
       <p class="muted small">${esc(c.area || "")}${c.products ? " · " + esc(c.products.name) : ""} · ${c.modules.length} modül</p></div>
-      <span class="pill ${c.published ? "ok" : "wait"}">${c.published ? "Yayında" : "Taslak"}</span>
-      <button class="btn sm ${c.published ? "ghost" : ""}" data-pub="${c.id}" data-v="${c.published ? "0" : "1"}">${c.published ? "Yayından kaldır" : "Yayımla"}</button>
+      ${reviewPill(c.review_status)}<span class="pill ${c.published ? "ok" : ""}">${c.published ? "Yayında" : "Yayında değil"}</span>
+      ${c.review_status === "draft" || c.review_status === "rejected" ? `<button class="btn ghost sm" data-send="${c.id}">İncelemeye gönder</button>` : ""}
+      <button class="btn sm ${c.published ? "ghost" : ""}" data-pub="${c.id}" data-v="${c.published ? "0" : "1"}" ${c.published || c.review_status === "approved" ? "" : 'disabled title="Önce hukuk onayı gerekli"'}>${c.published ? "Yayından kaldır" : "Yayımla"}</button>
       <button class="btn ghost sm" data-tg="${c.id}">${sub.open === c.id ? "Gizle" : "Modüller"}</button>
       <button class="btn ghost sm" data-ce="${c.id}">Düzenle</button>
       <button class="btn danger sm" data-cd="${c.id}">Sil</button></div>
+    ${c.review_status === "rejected" && c.review_note ? `<p class="small" style="color:var(--red);margin-top:8px">Ret gerekçesi: ${esc(c.review_note)}</p>` : ""}
     ${sub.open === c.id ? renderModules(c.modules) : ""}</div>`).join("")
   : `<div class="panel"><div class="empty"><div class="ic">${icon.book}</div><h3>Henüz müfredat yok</h3><p>Yapay zekâ destekli üretimle ilk müfredatınızı oluşturun, kontrol edip yayımlayın.</p></div></div>`}`;
   $("#newC").onclick = curriculumDialog;
+  $$("[data-send]").forEach(b => b.onclick = async () => {
+    check(await sb.from("curricula").update({ review_status: "in_review" }).eq("id", b.dataset.send)); toast("Hukuk incelemesine gönderildi"); await loadAll(); vMufredat();
+  });
   $$("[data-pub]").forEach(b => b.onclick = async () => { check(await sb.from("curricula").update({ published: b.dataset.v === "1" }).eq("id", b.dataset.pub)); toast(b.dataset.v === "1" ? "Yayımlandı" : "Yayından kaldırıldı"); await loadAll(); vMufredat(); });
   $$("[data-tg]").forEach(b => b.onclick = () => { sub.open = sub.open === b.dataset.tg ? null : b.dataset.tg; vMufredat(); });
   $$("[data-ce]").forEach(b => b.onclick = () => editCurriculumDialog(A.curricula.find(c => c.id === b.dataset.ce)));
@@ -391,8 +509,8 @@ function route() {
   const [p, arg] = h.split("/");
   const tab = p === "sinav" ? "sinavlar" : p;
   $$("nav.tabs a").forEach(a => a.classList.toggle("active", a.dataset.tab === tab));
-  const views = { genel: vGenel, kullanicilar: vKullanicilar, urunler: vUrunler, sinavlar: vSinavlar, mufredat: vMufredat, saha: vSaha, sinav: () => vSinavEdit(arg) };
+  const views = { genel: vGenel, kullanicilar: vKullanicilar, hekimler: vHekimler, urunler: vUrunler, sinavlar: vSinavlar, mufredat: vMufredat, saha: vSaha, duyurular: vDuyurular, sinav: () => vSinavEdit(arg) };
   (views[p] || vGenel)();
 }
 window.addEventListener("hashchange", () => { if (ME && ME.role === "admin") { route(); window.scrollTo(0, 0); } });
-boot(async () => { await loadAll(); route(); }, { adminOnly: true });
+boot(async () => { await loadAll(); $("nav.tabs").hidden = false; route(); }, { adminOnly: true });
