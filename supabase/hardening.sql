@@ -22,7 +22,7 @@ begin
     'members', (select count(*) from public.profiles where status = 'active'),
     'avg', (select coalesce(round(avg(score)), 0) from a where status = 'done'),
     'pass', (select coalesce(round(100.0 * count(*) filter (where score >= 70) / nullif(count(*), 0)), 0) from a where status = 'done'),
-    'completion', (select coalesce(round(100.0 * count(*) filter (where status = 'done') / nullif(count(*), 0)), 0) from a));
+    'completion', (select coalesce(round(100.0 * count(*) filter (where status = 'done') / nullif(count(*), 0)), 0) from a)));
 end $$;
 
 drop policy if exists "exams read" on public.exams;
