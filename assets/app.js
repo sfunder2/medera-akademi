@@ -491,7 +491,8 @@ function navItems() {
   const items = [];
   if (r === "avukat") items.push(["inceleme", "Hukuk incelemesi" + (D.reviewCount ? `<span class="badge-n">${D.reviewCount}</span>` : "")]);
   items.push(["portal", "Sınavlarım"], ["mufredat", "Müfredat"], ["ogrenme", "Öğrenme planım"], ["belgeler", "Kaynak belgeleri"]);
-  if (r === "pjp") items.push(["paydaslar", "Paydaşlar"]);
+  if (r === "pjp") items.push(["paydaslar", "Paydaşlar"], ["duello", "Düellolar"]);
+  if (r === "avukat") items.push(["duellosoru", "Düello soruları"]);
   if (r === "urun_muduru") items.push(["ekip", "Ekip raporu"]);
   return items;
 }
@@ -502,9 +503,10 @@ function route() {
   const page = allowed.includes(p) ? p : "portal";
   const tab = ["egitim", "kutuphane", "sinav"].includes(page) ? "portal" : page;
   $("#nav").innerHTML = navItems().map(([k, l]) => `<a href="#/${k}" class="${k === tab ? "active" : ""}">${l}</a>`).join("");
-  const views = { ogrenme: vOgrenme, belgeler: vBelgeler, portal: vPortal, egitim: vEgitim, kutuphane: vKutuphane, mufredat: vMufredat, paydaslar: vPaydaslar, ekip: vEkip, inceleme: vInceleme, profil: vProfil, sinav: () => vSinav(arg) };
+  const views = { duello: vDuello, duellosoru: vDuelQuestions, ogrenme: vOgrenme, belgeler: vBelgeler, portal: vPortal, egitim: vEgitim, kutuphane: vKutuphane, mufredat: vMufredat, paydaslar: vPaydaslar, ekip: vEkip, inceleme: vInceleme, profil: vProfil, sinav: () => vSinav(arg) };
   views[page]();
 }
 window.addEventListener("hashchange", () => { if (ME) { route(); window.scrollTo(0, 0); } });
 boot(async () => { await loadAll(); route(); });
+
 

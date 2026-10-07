@@ -133,3 +133,17 @@ supabase/functions/ai/     Claude API aracısı (Edge Function)
 ```
 
 
+
+## PJP bölge düelloları
+
+Mevcut veritabanına supabase/duels_v4.sql dosyasını eatures_v3.sql sonrasında tek işlem içinde uygulayın. PJP kullanıcıları **Düellolar** menüsünden Karadeniz, Akdeniz, Marmara, İç Anadolu veya Ege bölgelerini seçer.
+
+- Aylık sezon; her düelloda rakip analizi, ürün bilgisi, ilaç bilgisi, hekim görüşmesi ve saha planlama kategorilerinden birer soru.
+- Soru başına 30 saniye; doğru cevap 100 + kalan süreye göre en fazla 50 hız puanı. Yanlış/süre aşımı 0.
+- İki taraf da tamamladığında en az 3 doğru yapan kazanana 100 bonus; beraberlikte en az 3 doğru yapanlara 50 bonus.
+- Aynı PJP ile günde bir, kişi başına günde en fazla beş düello. Davet/oyun 24 saat veya sezon sonuna kadar açık.
+- Puan, süre, cevap anahtarı ve ödül hesapları sunucudadır. Kabul anında soruların sürümü korunur.
+- Bireysel sıralama puan, doğru sayısı ve süreye göre; bölge sıralaması katılan PJP başına ortalama puana göre hesaplanır.
+- Başlangıçta 10 **taslak** soru bulunur. Yönetim panelindeki **Düello soruları** bölümünden güncel şirket materyallerine göre kontrol edip hukuk incelemesine gönderin. Avukat veya yönetici onayı gerekir. Beş kategorinin tamamında onaylı soru olmadan maç açılamaz. Bankayı ürünlere ve rakiplere özel sorularla genişletin.
+- **Prim ve ödüller** bölümünde puan eşikleri, TL tutarı ve ödül tanımı belirlenir. Başlangıç eşikleri Bronz 1000, Gümüş 2500, Altın 5000 puandır; TL tutarları sıfırdır. Her eşik ayrı hak ediş oluşturur; yönetici onayı/teslim kaydı vardır, banka transferi yapılmaz.
+
