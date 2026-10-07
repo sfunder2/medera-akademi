@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Medera Akademi — Saha Eğitim Platformu</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="top-row">
+      <a class="brand" href="#/portal">
+        <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><rect x="1" y="1" width="26" height="26" rx="8" fill="#5FD0C4"/><path d="M8 19V9l6 6 6-6v10" stroke="#16252E" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Medera Akademi <small>Saha eğitim platformu</small>
+      </a>
+      <div class="top-actions">
+        <a class="icon-btn" id="adminLink" href="admin.html" hidden>Yönetim paneli</a>
+        <button class="icon-btn" id="themeBtn" aria-label="Tema değiştir" title="Tema değiştir">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        </button>
+        <button class="icon-btn" id="userBtn" title="Görünen adı değiştir"><span id="userName"></span></button>
+        <button class="icon-btn" id="signOut" hidden>Çıkış</button>
+      </div>
+    </div>
+    <nav class="tabs" aria-label="Ana menü">
+      <a href="#/portal" data-tab="portal">Sınavlarım</a>
+      <a href="#/mufredat" data-tab="mufredat">Müfredat</a>
+      <a href="#/paydaslar" data-tab="paydaslar">Paydaşlar</a>
+    </nav>
+  </div>
+</header>
+<main><div class="wrap" id="app"></div></main>
+<footer><div class="wrap"><span>Medera Akademi — saha ekipleri için eğitim, sınav ve bilgi merkezi</span><span>v2.0</span></div></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="assets/shared.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
