@@ -25,17 +25,37 @@ Deno.serve(async (req) => {
   });
   if (!who.ok) return json({ error: "Oturum gerekli" }, 401);
 
+  const user = await who.json();
+  const profile = await fetch(`${Deno.env.get("SUPABASE_URL")}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&select=status`, {
+    headers: { Authorization: req.headers.get("Authorization") ?? "", apikey },
+  });
+  if (!profile.ok) return json({ error: "Hesap durumu doğrulanamadı" }, 503);
+  const profiles = await profile.json();
+  if (profiles[0]?.status !== "active") return json({ error: "Hesabınız etkin değil" }, 403);
+
   const key = Deno.env.get("ANTHROPIC_API_KEY");
   if (!key) return json({ error: "Sunucuda ANTHROPIC_API_KEY tanımlı değil" }, 500);
 
   let body: { system?: string; messages?: { role: string; content: string }[]; stream?: boolean; max_tokens?: number };
   try { body = await req.json(); } catch { return json({ error: "Geçersiz istek" }, 400); }
+  if (!body || !Array.isArray(body.messages) || (body.system !== undefined && typeof body.system !== "string")
+      || (body.max_tokens !== undefined && (typeof body.max_tokens !== "number" || !Number.isFinite(body.max_tokens)))) {
+    return json({ error: "Geçersiz istek alanları" }, 400);
+  }
 
   const messages = (body.messages ?? [])
-    .filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim())
+    .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim())
     .slice(-20)
     .map((m) => ({ role: m.role, content: m.content.slice(0, 12000) }));
   if (!messages.length || messages[0].role !== "user") return json({ error: "Mesaj yok" }, 400);
+
+  const quota = await fetch(`${Deno.env.get("SUPABASE_URL")}/rest/v1/rpc/consume_ai_quota`, {
+    method: "POST",
+    headers: { Authorization: req.headers.get("Authorization") ?? "", apikey, "Content-Type": "application/json" },
+    body: "{}",
+  });
+  if (!quota.ok) return json({ error: "Kullanım hakkı doğrulanamadı" }, 503);
+  if (!(await quota.json())) return json({ error: "Günlük 50 istek sınırına ulaştınız" }, 429);
 
   const upstream = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -62,3 +82,4 @@ Deno.serve(async (req) => {
   const text = (data.content ?? []).filter((b: { type: string }) => b.type === "text").map((b: { text: string }) => b.text).join("");
   return json({ text });
 });
+

@@ -203,8 +203,8 @@ create or replace function public.submit_exam(p_assignment uuid, p_answers jsonb
 language plpgsql security definer set search_path = public as $$
 declare v_a public.exam_assignments; v_key jsonb; v_total int; v_correct int; v_score int;
 begin
-  select * into v_a from public.exam_assignments where id = p_assignment;
-  if v_a.id is null or v_a.user_id <> auth.uid() then raise exception 'Bu sınava erişiminiz yok'; end if;
+  select * into v_a from public.exam_assignments where id = p_assignment for update;
+  if auth.uid() is null or v_a.id is null or v_a.user_id is distinct from auth.uid() then raise exception 'Bu sınava erişiminiz yok'; end if;
   if v_a.status = 'done' then raise exception 'Bu sınav zaten gönderildi'; end if;
   select answers into v_key from public.exam_keys where exam_id = v_a.exam_id;
   v_total := coalesce(jsonb_array_length(v_key), 0);
@@ -225,7 +225,7 @@ language plpgsql security definer set search_path = public as $$
 declare v_a public.exam_assignments; v jsonb;
 begin
   select * into v_a from public.exam_assignments where id = p_assignment;
-  if v_a.id is null or (v_a.user_id <> auth.uid() and not public.is_admin()) then raise exception 'Erişim yok'; end if;
+  if auth.uid() is null or v_a.id is null or (v_a.user_id is distinct from auth.uid() and not public.is_admin()) then raise exception 'Erişim yok'; end if;
   if v_a.status <> 'done' then raise exception 'Sınav henüz tamamlanmadı'; end if;
   select jsonb_build_object('answers', answers, 'explanations', explanations) into v
     from public.exam_keys where exam_id = v_a.exam_id;
@@ -256,9 +256,11 @@ begin
   update public.profiles set role = p_role where id = p_user;
 end $$;
 
-revoke execute on function public.submit_exam(uuid, jsonb), public.exam_review(uuid), public.class_stats(), public.admin_set_role(uuid, text) from anon;
+revoke execute on function public.submit_exam(uuid, jsonb), public.exam_review(uuid), public.class_stats(), public.admin_set_role(uuid, text) from public, anon;
+grant execute on function public.submit_exam(uuid, jsonb), public.exam_review(uuid), public.class_stats(), public.admin_set_role(uuid, text) to authenticated;
 
 -- =====================================================================
 -- İLK YÖNETİCİ: siteye bir kez giriş yaptıktan sonra bunu ayrı çalıştırın
 -- update public.profiles set role = 'admin' where email = 'sizin@epostaniz.com';
 -- =====================================================================
+

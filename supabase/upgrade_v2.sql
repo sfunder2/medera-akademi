@@ -7,7 +7,13 @@
 
 -- ---------- Profil alanları ----------
 alter table public.profiles add column if not exists job_role text not null default 'pjp';
-alter table public.profiles add column if not exists status   text not null default 'pending';
+-- Preserve v1 accounts only when introducing the status column for the first time.
+do $$ begin
+  if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'status') then
+    alter table public.profiles add column status text not null default 'active';
+    alter table public.profiles alter column status set default 'pending';
+  end if;
+end $$;
 do $$ begin
   alter table public.profiles add constraint profiles_job_role_chk check (job_role in ('pjp','urun_muduru','avukat'));
 exception when duplicate_object then null; end $$;
@@ -15,8 +21,7 @@ do $$ begin
   alter table public.profiles add constraint profiles_status_chk check (status in ('pending','active','disabled'));
 exception when duplicate_object then null; end $$;
 
--- v1'den kalan mevcut kullanıcılar etkin kalsın
-update public.profiles set status = 'active' where status = 'pending' and created_at < now() - interval '1 second';
+-- Re-running this migration never approves pending accounts.
 
 -- ---------- Yardımcı fonksiyonlar ----------
 create or replace function public.is_admin() returns boolean
@@ -63,12 +68,8 @@ do $$ begin
   alter table public.curricula add constraint curricula_review_chk check (review_status in ('draft','in_review','approved','rejected'));
 exception when duplicate_object then null; end $$;
 
--- Daha önce yayımlanmış müfredatlar onaylı sayılsın (geriye uyumluluk)
-update public.curricula set review_status = 'approved' where published and review_status = 'draft';
--- Daha önce atanmış sınavlar onaylı sayılsın
-update public.exams e set review_status = 'approved'
- where not is_practice and review_status = 'draft'
-   and exists (select 1 from public.exam_assignments a where a.exam_id = e.id);
+-- Existing content requires an explicit review; do not auto-approve on reruns.
+update public.curricula set published = false where published and review_status <> 'approved';
 
 -- İçerik değişince onay düşer; onaysız müfredat yayımlanamaz
 create or replace function public.curricula_review_guard() returns trigger
@@ -182,12 +183,15 @@ language plpgsql security definer set search_path = public as $$
 declare v_a public.exam_assignments; v_key jsonb; v_total int; v_correct int; v_score int;
 begin
   if not public.is_active() then raise exception 'Hesabınız etkin değil'; end if;
-  select * into v_a from public.exam_assignments where id = p_assignment;
-  if v_a.id is null or v_a.user_id <> auth.uid() then raise exception 'Bu sınava erişiminiz yok'; end if;
+  select * into v_a from public.exam_assignments where id = p_assignment for update;
+  if auth.uid() is null or v_a.id is null or v_a.user_id is distinct from auth.uid() then raise exception 'Bu sınava erişiminiz yok'; end if;
   if v_a.status = 'done' then raise exception 'Bu sınav zaten gönderildi'; end if;
+  if exists (select 1 from public.exams where id = v_a.exam_id and not is_practice and review_status <> 'approved') then raise exception 'Sınav yeniden hukuk onayı bekliyor'; end if;
   select answers into v_key from public.exam_keys where exam_id = v_a.exam_id;
   v_total := coalesce(jsonb_array_length(v_key), 0);
   if v_total = 0 then raise exception 'Cevap anahtarı bulunamadı'; end if;
+  if jsonb_typeof(p_answers) is distinct from 'array' then raise exception 'Geçersiz cevaplar'; end if;
+  if jsonb_array_length(p_answers) <> v_total then raise exception 'Cevap sayısı sorularla eşleşmiyor'; end if;
   select count(*) into v_correct
     from jsonb_array_elements_text(v_key) with ordinality as k(val, i)
     where p_answers->>((k.i - 1)::int) = k.val;
@@ -305,3 +309,4 @@ revoke execute on function public.admin_set_status(uuid, text), public.admin_set
 -- İLK YÖNETİCİ: siteye kayıt olduktan sonra ayrı çalıştırın
 -- update public.profiles set role = 'admin', status = 'active' where email = 'sizin@epostaniz.com';
 -- =====================================================================
+

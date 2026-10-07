@@ -18,7 +18,7 @@ Güvenlik notları: Cevap anahtarları ayrı tabloda tutulur ve kullanıcılar a
 
 ### 1. Supabase projesi
 1. https://supabase.com adresinde ücretsiz hesap açın ve **New project** ile proje oluşturun.
-2. Sol menüden **SQL Editor → New query** açın, `supabase/schema.sql` dosyasının tamamını yapıştırıp **Run**'a basın. Ardından aynı şekilde `supabase/upgrade_v2.sql` dosyasını çalıştırın. (`schema.sql` yalnızca bir kez çalıştırılır; `upgrade_v2.sql` tekrar çalıştırılabilir.)
+2. Sol menüden **SQL Editor → New query** açın, `supabase/schema.sql` dosyasının tamamını yapıştırıp **Run**'a basın. Ardından aynı şekilde `supabase/upgrade_v2.sql` dosyasını çalıştırın. Ardından `supabase/hardening.sql` dosyasını çalıştırın. (`schema.sql` yalnızca bir kez çalıştırılır; yükseltme ve güvenlik dosyaları birlikte tekrar çalıştırılabilir.)
 
 ### 2. GitHub deposu ve Pages
 1. GitHub'da yeni bir depo oluşturun (örn. `medera-akademi`).
@@ -45,7 +45,7 @@ supabase functions deploy ai
 ```
 CLI kullanmak istemezseniz: Supabase panelinde **Edge Functions → Deploy a new function → Via Editor** ile `ai` adında fonksiyon oluşturun ve `supabase/functions/ai/index.ts` içeriğini yapıştırın. Ardından **Edge Functions → Secrets** bölümüne `ANTHROPIC_API_KEY` ekleyin.
 
-Varsayılan model `claude-sonnet-5-5`. Değiştirmek için `ANTHROPIC_MODEL` gizli değişkenini tanımlayın.
+Varsayılan model `claude-sonnet-5-5`. Değiştirmek için `ANTHROPIC_MODEL` gizli değişkenini tanımlayın. Yapay zekâ yalnızca etkin hesaplara açıktır ve hesap başına günlük 50 istek sınırı uygular.
 
 ### 4. config.js
 Supabase panelinde **Project Settings → API** bölümünden Project URL ve anon (public/publishable) anahtarı kopyalayıp `config.js` dosyasına yazın, sonra GitHub'a yeniden yükleyin. Bu anahtarın herkese açık olması güvenlidir. Anthropic anahtarını **asla** buraya yazmayın.
@@ -119,3 +119,4 @@ supabase/upgrade_v2.sql    Roller, onay, hukuk incelemesi, duyurular, ekip rapor
 supabase/functions/ai/     Claude API aracısı (Edge Function)
 .nojekyll                  GitHub Pages'in dosyaları işlememesi için
 ```
+
