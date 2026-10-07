@@ -162,7 +162,7 @@ Sekiz geliştirme aynı modülde birleşir: yazılı itiraz kartları ve isteğe
 
 ### Mevcut projeyi etkinleştirme
 
-Supabase **SQL Editor** içinde `supabase/field_training_v6.sql` dosyasının tamamını çalıştırın. Önce `features_v3.sql` uygulanmış olmalıdır. Yeni dosya kendi işlemini açar ve başarıyla bitince tamamlar; tekrar uygulanabilir. Tarayıcı ekranlarının yayını tek başına veritabanı kurulumunu tamamlamaz. Bu sürüm canlı Supabase yönetim bağlantısı olmadan geliştirildi; migration canlı projeye otomatik uygulanmadı.
+Supabase **SQL Editor** içinde `supabase/field_training_v6.sql` dosyasının tamamını çalıştırın. Önce `features_v3.sql` uygulanmış olmalıdır. Yeni dosya kendi işlemini açar ve başarıyla bitince tamamlar; tekrar uygulanabilir. Tarayıcı ekranlarının yayını tek başına veritabanı kurulumunu tamamlamaz. 8 Ekim 2026 tarihinde `field_training_v6` migration'ı canlı Medera Supabase projesine başarıyla uygulandı. Beş yeni tabloda RLS, özel cevap anahtarlarının erişim yasağı ve etkin yönetici bağlamında liste/geçmiş/beceri haritası/bildirim çağrıları doğrulandı. Mevcut kayıtlar korundu. Kurulum anında ürün ataması ve onaylı kaynak belgesi yoktu; içerikleri yayımlamak için aşağıdaki hazırlık adımları gerekir.
 
 1. Ürün Müdürüne yönetici panelinden ürün atayın. Kaynak belgeleri bölümüne güncel ürün/rakip materyallerini sayfalarıyla ekleyip onaylatın.
 2. Ürün Müdürü **İçerik atölyesi** bölümünde tür, ürün, uzmanlık, hedef beceri, içerik ve kaynak sayfalarını seçer. Alıştırma adımlarına seçenek, puan ve açıklama girer. Dallanan görüşmelerde sonraki adımı seçer; diğer türlerde adımlar sırayla tamamlanır.
