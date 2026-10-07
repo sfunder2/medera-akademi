@@ -1,8 +1,16 @@
 /* Ortak yardımcılar: Supabase istemcisi, giriş, yapay zekâ, arayüz araçları */
 const CFG = window.APP_CONFIG || {};
+const RECOVERY_LINK = /type=recovery/.test(location.hash);
 const CONFIGURED = !!(CFG.SUPABASE_URL && !CFG.SUPABASE_URL.includes("YOUR_") && CFG.SUPABASE_ANON_KEY && !CFG.SUPABASE_ANON_KEY.includes("YOUR_"));
 const sb = CONFIGURED ? window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY) : null;
 let ME = null;
+let RECOVERY = RECOVERY_LINK;
+if (sb) sb.auth.onAuthStateChange(ev => { if (ev === "PASSWORD_RECOVERY") RECOVERY = true; });
+const JOB_ROLES = { pjp: "PJP", urun_muduru: "Ürün Müdürü", avukat: "Avukat" };
+const roleLabel = r => JOB_ROLES[r] || r || "—";
+const REVIEW_LABEL = { draft: "Taslak", in_review: "Hukuk incelemesinde", approved: "Hukuk onaylı", rejected: "Reddedildi" };
+const REVIEW_PILL = { draft: "", in_review: "wait", approved: "ok", rejected: "bad" };
+const reviewPill = s => `<span class="pill ${REVIEW_PILL[s] || ""}">${REVIEW_LABEL[s] || s}</span>`;
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -58,28 +66,92 @@ function initTheme() {
   };
 }
 
-/* ---------- Giriş ---------- */
+/* ---------- Giriş, kayıt, şifre ---------- */
 function showSetup(el) {
   el.innerHTML = `<div class="panel auth"><h2>Kurulum tamamlanmadı</h2>
-    <p class="muted" style="margin-top:6px">config.js dosyasına Supabase proje adresinizi ve anon anahtarınızı yazın. Adımlar README.md dosyasında.</p></div>`;
+    <p class="muted" style="margin-top:6px">config.js dosyasına Supabase proje adresinizi ve publishable (anon) anahtarınızı yazın. Adımlar README.md dosyasında.</p></div>`;
 }
-function showLogin(el) {
-  el.innerHTML = `<div class="panel auth">
-    <h1>Giriş yap</h1>
-    <p class="muted" style="margin-bottom:18px">E-posta adresinizi yazın, size tek kullanımlık bir giriş bağlantısı gönderelim.</p>
-    <div class="field"><label for="em">E-posta</label><input type="email" id="em" autocomplete="email" placeholder="ad.soyad@sirket.com"></div>
-    <button class="btn" id="go" style="width:100%">Giriş bağlantısı gönder</button>
-    <p class="muted small" id="lmsg" style="margin-top:12px"></p></div>`;
+const siteUrl = () => location.origin + location.pathname.replace(/admin\.html$/, "");
+function authErr(e) {
+  const m = (e && e.message) || "";
+  if (/Invalid login credentials/i.test(m)) return "E-posta veya şifre hatalı.";
+  if (/Email not confirmed/i.test(m)) return "E-posta adresiniz henüz doğrulanmadı. Gelen kutunuzdaki doğrulama bağlantısına tıklayın.";
+  if (/already registered|already exists/i.test(m)) return "Bu e-posta adresiyle zaten bir hesap var. Giriş yapmayı deneyin.";
+  if (/rate limit/i.test(m)) return "Çok fazla deneme yapıldı. Birkaç dakika sonra tekrar deneyin.";
+  if (/Password should be/i.test(m)) return "Şifre en az 8 karakter olmalı.";
+  return m || "Bir hata oluştu. Tekrar deneyin.";
+}
+function showAuth(el, mode = "login") {
+  const tabs = mode === "login" || mode === "register" ? `<div class="seg" style="margin-bottom:20px">
+      <button data-m="login" class="${mode === "login" ? "on" : ""}">Giriş yap</button>
+      <button data-m="register" class="${mode === "register" ? "on" : ""}">Kayıt ol</button></div>` : "";
+  let body = "";
+  if (mode === "login") body = `
+    <h1>Giriş yap</h1><p class="muted" style="margin-bottom:18px">Hesabınıza e-posta ve şifrenizle giriş yapın.</p>
+    <div class="field"><label for="em">E-posta</label><input type="email" id="em" autocomplete="email"></div>
+    <div class="field"><label for="pw">Şifre</label><input type="password" id="pw" autocomplete="current-password"></div>
+    <button class="btn" id="go" style="width:100%">Giriş yap</button>
+    <p style="margin-top:14px;text-align:center"><button class="linkbtn" data-m="forgot">Şifremi unuttum</button></p>`;
+  if (mode === "register") body = `
+    <h1>Kayıt ol</h1><p class="muted" style="margin-bottom:18px">Hesabınız yönetici onayından sonra etkinleşir.</p>
+    <div class="field"><label for="fn">Ad soyad</label><input type="text" id="fn" autocomplete="name"></div>
+    <div class="field"><label for="em">E-posta</label><input type="email" id="em" autocomplete="email"></div>
+    <div class="field"><label for="rl">Rol</label><select id="rl"><option value="">Rolünüzü seçin</option>${Object.entries(JOB_ROLES).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></div>
+    <div class="field"><label for="pw">Şifre</label><input type="password" id="pw" autocomplete="new-password" placeholder="En az 8 karakter"></div>
+    <div class="field"><label for="pw2">Şifre (tekrar)</label><input type="password" id="pw2" autocomplete="new-password"></div>
+    <button class="btn" id="go" style="width:100%">Kayıt ol</button>`;
+  if (mode === "forgot") body = `
+    <h1>Şifremi unuttum</h1><p class="muted" style="margin-bottom:18px">E-posta adresinizi yazın, şifre yenileme bağlantısı gönderelim.</p>
+    <div class="field"><label for="em">E-posta</label><input type="email" id="em" autocomplete="email"></div>
+    <button class="btn" id="go" style="width:100%">Yenileme bağlantısı gönder</button>
+    <p style="margin-top:14px;text-align:center"><button class="linkbtn" data-m="login">Girişe dön</button></p>`;
+  if (mode === "reset") body = `
+    <h1>Yeni şifre belirle</h1><p class="muted" style="margin-bottom:18px">Hesabınız için yeni bir şifre yazın.</p>
+    <div class="field"><label for="pw">Yeni şifre</label><input type="password" id="pw" autocomplete="new-password" placeholder="En az 8 karakter"></div>
+    <div class="field"><label for="pw2">Yeni şifre (tekrar)</label><input type="password" id="pw2" autocomplete="new-password"></div>
+    <button class="btn" id="go" style="width:100%">Şifreyi kaydet</button>`;
+  el.innerHTML = `<div class="panel auth">${tabs}${body}<p class="small" id="msg" style="margin-top:12px" role="status"></p></div>`;
+  $$("[data-m]", el).forEach(b => b.onclick = () => showAuth(el, b.dataset.m));
+  const msg = (t, ok) => { const m = $("#msg", el); m.textContent = t; m.style.color = ok ? "var(--green)" : "var(--red)"; };
   const go = async () => {
-    const email = $("#em").value.trim();
-    if (!/^\S+@\S+\.\S+$/.test(email)) { $("#lmsg").textContent = "Geçerli bir e-posta adresi yazın."; return; }
-    const b = $("#go"); busyBtn(b, true, "Gönderiliyor");
-    const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.href.split("#")[0] } });
-    busyBtn(b, false, "Giriş bağlantısı gönder");
-    $("#lmsg").textContent = error ? "Gönderilemedi: " + error.message : "Bağlantı gönderildi. E-postanızdaki bağlantıya bu tarayıcıda tıklayın.";
+    const b = $("#go", el), label = b.textContent;
+    const email = $("#em", el)?.value.trim(), pw = $("#pw", el)?.value, pw2 = $("#pw2", el)?.value;
+    if ($("#em", el) && !/^\S+@\S+\.\S+$/.test(email)) return msg("Geçerli bir e-posta adresi yazın.");
+    if (mode === "register") {
+      if (!$("#fn", el).value.trim()) return msg("Ad soyad yazın.");
+      if (!$("#rl", el).value) return msg("Rolünüzü seçin.");
+    }
+    if ((mode === "register" || mode === "reset") && (!pw || pw.length < 8)) return msg("Şifre en az 8 karakter olmalı.");
+    if ((mode === "register" || mode === "reset") && pw !== pw2) return msg("Şifreler eşleşmiyor.");
+    if (mode === "login" && !pw) return msg("Şifrenizi yazın.");
+    busyBtn(b, true, "Bekleyin");
+    let r;
+    if (mode === "login") r = await sb.auth.signInWithPassword({ email, password: pw });
+    if (mode === "register") r = await sb.auth.signUp({ email, password: pw, options: { emailRedirectTo: siteUrl(), data: { full_name: $("#fn", el).value.trim(), job_role: $("#rl", el).value } } });
+    if (mode === "forgot") r = await sb.auth.resetPasswordForEmail(email, { redirectTo: siteUrl() });
+    if (mode === "reset") r = await sb.auth.updateUser({ password: pw });
+    busyBtn(b, false, label);
+    if (r.error) return msg(authErr(r.error));
+    if (mode === "login") return location.reload();
+    if (mode === "register") {
+      if (r.data.session) return location.reload();
+      el.innerHTML = `<div class="panel auth"><h2>Kaydınız alındı</h2><p class="muted" style="margin:8px 0 16px">${esc(email)} adresine bir doğrulama bağlantısı gönderdik. Bağlantıya tıkladıktan sonra hesabınız yönetici onayına düşer.</p><button class="btn ghost" id="bk">Girişe dön</button></div>`;
+      $("#bk", el).onclick = () => showAuth(el, "login"); return;
+    }
+    if (mode === "forgot") return msg("Bağlantı gönderildi. E-postanızı kontrol edin.", true);
+    if (mode === "reset") { RECOVERY = false; history.replaceState(null, "", location.pathname); toast("Şifreniz güncellendi"); setTimeout(() => location.reload(), 800); }
   };
-  $("#go").onclick = go;
-  $("#em").onkeydown = e => { if (e.key === "Enter") go(); };
+  $("#go", el).onclick = go;
+  $$("input", el).forEach(i => i.onkeydown = e => { if (e.key === "Enter") go(); });
+}
+function showStatus(el, status) {
+  const pending = status === "pending";
+  el.innerHTML = `<div class="panel auth"><h2>${pending ? "Hesabınız onay bekliyor" : "Hesabınız devre dışı"}</h2>
+    <p class="muted" style="margin:8px 0 6px">${pending ? "Kaydınız alındı. Yönetici hesabınızı onayladığında tüm içeriğe erişebileceksiniz." : "Erişiminiz yönetici tarafından kapatıldı. Bir hata olduğunu düşünüyorsanız yöneticinizle iletişime geçin."}</p>
+    <p class="small muted" style="margin-bottom:16px">${esc(ME.full_name || "")} · ${esc(ME.email)} · ${roleLabel(ME.job_role)}</p>
+    <div class="row">${pending ? `<button class="btn" id="rf">Durumu yenile</button>` : ""}<button class="btn ghost" id="so">Çıkış yap</button></div></div>`;
+  const rf = $("#rf", el); if (rf) rf.onclick = () => location.reload();
+  $("#so", el).onclick = async () => { await sb.auth.signOut(); location.reload(); };
 }
 
 /* Sayfayı başlat: oturum + profil kontrolü */
@@ -89,25 +161,23 @@ async function boot(render, { adminOnly = false } = {}) {
   if (!CONFIGURED) { showSetup(el); return; }
   el.innerHTML = `<div class="center"><span class="spin"></span></div>`;
   const { data: { session } } = await sb.auth.getSession();
-  if (!session) { showLogin(el); sb.auth.onAuthStateChange(ev => { if (ev === "SIGNED_IN") location.reload(); }); return; }
+  if (!session) { showAuth(el, "login"); return; }
+  if (RECOVERY) { showAuth(el, "reset"); return; }
   const { data: profile, error } = await sb.from("profiles").select("*").eq("id", session.user.id).single();
   if (error || !profile) {
-    el.innerHTML = `<div class="panel auth"><h2>Profil bulunamadı</h2><p class="muted">Veritabanı şeması kurulmamış olabilir (supabase/schema.sql). Hata: ${esc(error?.message)}</p></div>`;
+    el.innerHTML = `<div class="panel auth"><h2>Profil bulunamadı</h2><p class="muted">Veritabanı kurulumu eksik olabilir (supabase/schema.sql ve upgrade_v2.sql). Hata: ${esc(error?.message)}</p></div>`;
     return;
   }
   ME = profile;
+  const so = $("#signOut"); if (so) { so.hidden = false; so.onclick = async () => { await sb.auth.signOut(); location.href = location.pathname; }; }
+  const un = $("#userName"); if (un) un.textContent = ME.full_name || ME.email;
+  const ub = $("#userBtn"); if (ub) ub.hidden = false;
+  if (ME.status && ME.status !== "active") { showStatus(el, ME.status); return; }
   if (adminOnly && ME.role !== "admin") {
     el.innerHTML = `<div class="panel auth"><h2>Bu sayfa yöneticilere özel</h2><p class="muted" style="margin:6px 0 16px">Hesabınızın yönetici yetkisi yok.</p><a class="btn" href="./">Uygulamaya dön</a></div>`;
     return;
   }
-  const un = $("#userName"); if (un) un.textContent = ME.full_name || ME.email;
   const al = $("#adminLink"); if (al && ME.role === "admin") al.hidden = false;
-  const so = $("#signOut"); if (so) { so.hidden = false; so.onclick = async () => { await sb.auth.signOut(); location.href = location.pathname; }; }
-  const ub = $("#userBtn"); if (ub) ub.onclick = async () => {
-    const n = prompt("Görünen adınız:", ME.full_name || ""); if (!n || !n.trim()) return;
-    check(await sb.from("profiles").update({ full_name: n.trim() }).eq("id", ME.id));
-    ME.full_name = n.trim(); $("#userName").textContent = ME.full_name; toast("Ad güncellendi");
-  };
   sb.auth.onAuthStateChange(ev => { if (ev === "SIGNED_OUT") location.reload(); });
   await render();
 }
