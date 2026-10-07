@@ -3,8 +3,6 @@
 // Gerekli gizli değişken:  ANTHROPIC_API_KEY
 // İsteğe bağlı:            ANTHROPIC_MODEL (varsayılan aşağıda), ALLOWED_ORIGIN (örn. https://kullanici.github.io)
 
-import { createClient } from "jsr:@supabase/supabase-js@2";
-
 const ORIGIN = Deno.env.get("ALLOWED_ORIGIN") ?? "*";
 const MODEL = Deno.env.get("ANTHROPIC_MODEL") ?? "claude-sonnet-5-5";
 const cors = {
@@ -20,11 +18,12 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Yalnızca POST" }, 405);
 
   // Yalnızca giriş yapmış kullanıcılar
-  const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
-    global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
+  // (Yeni "publishable" anahtarlarla da çalışması için istemcinin gönderdiği apikey kullanılır)
+  const apikey = Deno.env.get("SUPABASE_ANON_KEY") || req.headers.get("apikey") || "";
+  const who = await fetch(`${Deno.env.get("SUPABASE_URL")}/auth/v1/user`, {
+    headers: { Authorization: req.headers.get("Authorization") ?? "", apikey },
   });
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) return json({ error: "Oturum gerekli" }, 401);
+  if (!who.ok) return json({ error: "Oturum gerekli" }, 401);
 
   const key = Deno.env.get("ANTHROPIC_API_KEY");
   if (!key) return json({ error: "Sunucuda ANTHROPIC_API_KEY tanımlı değil" }, 500);
