@@ -147,3 +147,11 @@ Mevcut veritabanına supabase/duels_v4.sql dosyasını eatures_v3.sql sonrasın
 - Başlangıçta 10 **taslak** soru bulunur. Yönetim panelindeki **Düello soruları** bölümünden güncel şirket materyallerine göre kontrol edip hukuk incelemesine gönderin. Avukat veya yönetici onayı gerekir. Beş kategorinin tamamında onaylı soru olmadan maç açılamaz. Bankayı ürünlere ve rakiplere özel sorularla genişletin.
 - **Prim ve ödüller** bölümünde puan eşikleri, TL tutarı ve ödül tanımı belirlenir. Başlangıç eşikleri Bronz 1000, Gümüş 2500, Altın 5000 puandır; TL tutarları sıfırdır. Her eşik ayrı hak ediş oluşturur; yönetici onayı/teslim kaydı vardır, banka transferi yapılmaz.
 
+
+## Sesli hekim simülasyonu (v5)
+
+PJP menüsündeki **Hekim simülasyonu**: ürün ve hekim karakteri seçimi, Türkçe mikrofonla yazıya çevirme, düzeltilebilir metin, sesli hekim yanıtı, sesi kesme ve indirilebilir görüşme raporu. Tarayıcı ses tanımasını desteklemezse yazılı akış çalışır. Oturum sayfadan ayrılınca silinir; ham ses kaydedilmez. Tarayıcı sağlayıcısı ses tanımayı kendi hizmetinde işleyebilir.
+
+Mevcut `ai` Edge Function kullanılır; yeni SQL kurulumu gerekmez. Etkin hesap, atanmış ürün ve çalışan AI servisi gerekir. Tıbbi iddialar `search_sources` üzerinden erişilebilir onaylı belgelerle incelenir. Kaynak yoksa doğruluk doğrulanmış sayılmaz. İletişim ve itiraz karşılama puanları metne dayalı eğitim geri bildirimidir. Ses tonu / akustik analiz ve gerçek zamanlı otomatik söz kesme bu sürümde yoktur; hekimin sesli yanıtı düğmeyle kesilebilir.
+
+Kontrol: `node tests/roleplay.test.cjs`.
