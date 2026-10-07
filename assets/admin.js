@@ -251,7 +251,7 @@ function vSinavlar() {
       ${e.review_status === "rejected" && e.review_note ? `<p class="small" style="color:var(--red);margin-top:4px">Ret gerekçesi: ${esc(e.review_note)}</p>` : ""}</div>
       ${reviewPill(e.review_status)}
       ${e.review_status === "draft" || e.review_status === "rejected" ? `<button class="btn ghost sm" data-send="${e.id}">İncelemeye gönder</button>` : ""}
-      <button class="btn sm" data-as="${e.id}" ${e.review_status === "approved" ? "" : 'disabled title="Önce hukuk onayı gerekli"'}>Ata</button><button class="btn ghost sm" data-rs="${e.id}">Sonuçlar</button>
+      <button class="btn sm" data-as="${e.id}" ${e.review_status === "approved" ? "" : 'disabled title="Önce hukuk onayı gerekli"'}>Ata</button><button class="btn ghost sm" data-history="${e.id}">Sürümler</button><button class="btn ghost sm" data-rs="${e.id}">Sonuçlar</button>
       <button class="btn ghost sm" data-ed="${e.id}">Düzenle</button><button class="btn danger sm" data-dl="${e.id}">Sil</button></div>`;
   }).join("")}</div>`
   : `<div class="empty"><div class="ic">${icon.folder}</div><h3>Henüz sınav yok</h3><p>Yapay zekâyla taslak oluşturun ya da soruları kendiniz yazın.</p></div>`}</div>`;
@@ -260,6 +260,7 @@ function vSinavlar() {
   $$("[data-send]").forEach(b => b.onclick = async () => {
     check(await sb.from("exams").update({ review_status: "in_review" }).eq("id", b.dataset.send)); toast("Hukuk incelemesine gönderildi"); await loadAll(); vSinavlar();
   });
+  $$("[data-history]").forEach(b => b.onclick = () => contentHistoryDialog("exams", b.dataset.history));
   $$("[data-rs]").forEach(b => b.onclick = () => resultsDialog(b.dataset.rs));
   $$("[data-ed]").forEach(b => b.onclick = () => location.hash = "#/sinav/" + b.dataset.ed);
   $$("[data-dl]").forEach(b => b.onclick = async () => {
@@ -418,7 +419,7 @@ function vMufredat() {
       ${c.review_status === "draft" || c.review_status === "rejected" ? `<button class="btn ghost sm" data-send="${c.id}">İncelemeye gönder</button>` : ""}
       <button class="btn sm ${c.published ? "ghost" : ""}" data-pub="${c.id}" data-v="${c.published ? "0" : "1"}" ${c.published || c.review_status === "approved" ? "" : 'disabled title="Önce hukuk onayı gerekli"'}>${c.published ? "Yayından kaldır" : "Yayımla"}</button>
       <button class="btn ghost sm" data-tg="${c.id}">${sub.open === c.id ? "Gizle" : "Modüller"}</button>
-      <button class="btn ghost sm" data-ce="${c.id}">Düzenle</button>
+      <button class="btn ghost sm" data-cur-history="${c.id}">Sürümler</button><button class="btn ghost sm" data-ce="${c.id}">Düzenle</button>
       <button class="btn danger sm" data-cd="${c.id}">Sil</button></div>
     ${c.review_status === "rejected" && c.review_note ? `<p class="small" style="color:var(--red);margin-top:8px">Ret gerekçesi: ${esc(c.review_note)}</p>` : ""}
     ${sub.open === c.id ? renderModules(c.modules) : ""}</div>`).join("")
@@ -429,6 +430,7 @@ function vMufredat() {
   });
   $$("[data-pub]").forEach(b => b.onclick = async () => { check(await sb.from("curricula").update({ published: b.dataset.v === "1" }).eq("id", b.dataset.pub)); toast(b.dataset.v === "1" ? "Yayımlandı" : "Yayından kaldırıldı"); await loadAll(); vMufredat(); });
   $$("[data-tg]").forEach(b => b.onclick = () => { sub.open = sub.open === b.dataset.tg ? null : b.dataset.tg; vMufredat(); });
+  $$("[data-cur-history]").forEach(b => b.onclick = () => contentHistoryDialog("curricula", b.dataset.curHistory));
   $$("[data-ce]").forEach(b => b.onclick = () => editCurriculumDialog(A.curricula.find(c => c.id === b.dataset.ce)));
   $$("[data-cd]").forEach(b => b.onclick = async () => { if (!confirm("Müfredat silinsin mi?")) return; check(await sb.from("curricula").delete().eq("id", b.dataset.cd)); await loadAll(); vMufredat(); });
 }
@@ -509,8 +511,9 @@ function route() {
   const [p, arg] = h.split("/");
   const tab = p === "sinav" ? "sinavlar" : p;
   $$("nav.tabs a").forEach(a => a.classList.toggle("active", a.dataset.tab === tab));
-  const views = { genel: vGenel, kullanicilar: vKullanicilar, hekimler: vHekimler, urunler: vUrunler, sinavlar: vSinavlar, mufredat: vMufredat, saha: vSaha, duyurular: vDuyurular, sinav: () => vSinavEdit(arg) };
+  const views = { belgeler: vBelgeler, gecmis: vIslemGecmisi, genel: vGenel, kullanicilar: vKullanicilar, hekimler: vHekimler, urunler: vUrunler, sinavlar: vSinavlar, mufredat: vMufredat, saha: vSaha, duyurular: vDuyurular, sinav: () => vSinavEdit(arg) };
   (views[p] || vGenel)();
 }
 window.addEventListener("hashchange", () => { if (ME && ME.role === "admin") { route(); window.scrollTo(0, 0); } });
 boot(async () => { await loadAll(); $("nav.tabs").hidden = false; route(); }, { adminOnly: true });
+

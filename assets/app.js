@@ -9,7 +9,7 @@ async function loadAll() {
   const uid = ME.id;
   const [p, a, c, h, i, s, an, rv] = await Promise.all([
     sb.from("user_products").select("products(*)").eq("user_id", uid),
-    sb.from("exam_assignments").select("*, exams(id,title,area,description,questions,is_practice)").eq("user_id", uid).order("assigned_at", { ascending: false }),
+    sb.rpc("my_assignments"),
     sb.from("curricula").select("*, products(name)").eq("published", true).order("created_at", { ascending: false }),
     sb.from("hcps").select("*").eq("owner_id", uid).order("name"),
     sb.from("interactions").select("*, products(name)").eq("owner_id", uid).order("date", { ascending: false }),
@@ -214,7 +214,7 @@ function libAI() {
       <select id="ctx" class="auto" style="min-width:160px"><option>Genel</option>
         ${AREAS.map(a => `<option ${ctx === a ? "selected" : ""}>${a}</option>`).join("")}
         ${D.products.map(p => `<option ${ctx === p.name ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>
-    <div class="chat"><div class="msgs" id="msgs"></div>
+    <label class="check" style="margin-bottom:12px"><input type="checkbox" id="grounded" checked>Yalnızca onaylı belgelerden yanıtla</label><div class="chat"><div class="msgs" id="msgs"></div>
       <div><div class="composer"><textarea id="ask" placeholder="Bir soru sorun…" aria-label="Soru"></textarea><button class="btn" id="send">Gönder</button></div>
       <p class="hint">Enter ile gönderin, Shift+Enter ile yeni satır ekleyin. Yanıtlar eğitim amaçlıdır; resmi kaynaklarla doğrulayın.</p></div></div></div>`;
   $("#ctx").onchange = e => { sub.ctx = e.target.value; };
@@ -231,7 +231,8 @@ function renderMsgs() {
     $$(".chips button", m).forEach(b => b.onclick = () => { $("#ask").value = b.textContent; sendChat(); });
     return;
   }
-  m.innerHTML = chat.map(x => `<div class="msg ${x.role === "user" ? "me" : "ai"}">${x.content ? esc(x.content) : '<span class="spin"></span> Düşünüyor'}</div>`).join("");
+  m.innerHTML = chat.map(x => `<div class="msg ${x.role === "user" ? "me" : "ai"}">${x.content ? esc(x.content) : '<span class="spin"></span> Düşünüyor'}${x.sources?.length ? `<div style="margin-top:10px"><b>Kaynak sayfalar</b><br>${sourceLinks(x.sources)}</div>` : ''}</div>`).join("");
+  bindSourceLinks(m);
   m.scrollTop = m.scrollHeight;
 }
 async function sendChat() {
@@ -245,7 +246,7 @@ async function sendChat() {
   const slot = { role: "assistant", content: "" }; chat.push(slot);
   chatBusy = true; $("#send").disabled = true; renderMsgs();
   try {
-    slot.content = await ai({ system: SYS + "\n" + ctxText, messages: turns, stream: true, onText: t => { slot.content = t; renderMsgs(); } }) || "Yanıt boş döndü.";
+    slot.content = await ai({ system: SYS + "\n" + ctxText, messages: turns, stream: !$("#grounded")?.checked, grounded: !!$("#grounded")?.checked, productId: prod?.id || null, onSources: sources => { slot.sources = sources; }, onText: t => { slot.content = t; renderMsgs(); } }) || "Yanıt boş döndü.";
   } catch (e) { slot.content = e.text || aiError(e); }
   chatBusy = false; const s = $("#send"); if (s) s.disabled = false; renderMsgs();
 }
@@ -304,12 +305,24 @@ function pHekim() {
     const d = dialog(`<h2>Hekim ekle</h2>
       <div class="field"><label for="hn">Ad soyad</label><input type="text" id="hn" placeholder="Dr. …"></div>
       <div class="field"><label for="hsp">Uzmanlık</label><select id="hsp">${SPECS.map(s => `<option>${s}</option>`).join("")}</select></div>
-      <div class="field"><label for="hi">Kurum</label><input type="text" id="hi"></div>
-      <div class="field"><label for="hci">Şehir</label><input type="text" id="hci"></div>
+      <div class="field"><label for="hci">Şehir</label><select id="hci"><option value="">Şehir seçin</option>${TR_CITIES.map(c=>`<option>${esc(c)}</option>`).join('')}</select></div>
+      <div class="field"><label for="hi">Kurum</label><input type="text" id="hi" list="institutionOptions" maxlength="200" placeholder="Listeden seçin veya yeni kurum yazın"><datalist id="institutionOptions"></datalist><p class="hint">Listede olmayan kurum, hekim kaydıyla birlikte kurum listesine eklenir.</p></div>
       <div class="row end"><button class="btn ghost" id="hx">Vazgeç</button><button class="btn" id="hsv">Hekimi kaydet</button></div>`);
+    let institutionRequest = 0;
+    $("#hci", d).onchange = async () => {
+      const current = ++institutionRequest, city = $("#hci", d).value;
+      $("#institutionOptions", d).innerHTML = '';
+      if(!city)return;
+      const r=await sb.from('institutions').select('name').eq('city',city).order('name').limit(500);
+      if(current===institutionRequest)$("#institutionOptions",d).innerHTML=(r.data||[]).map(x=>`<option value="${esc(x.name)}"></option>`).join('');
+    };
     $("#hx", d).onclick = () => d.remove();
     $("#hsv", d).onclick = async () => {
       const name = $("#hn", d).value.trim(); if (!name) { $("#hn", d).focus(); return; }
+      const inst = $("#hi", d).value.trim(), city = $("#hci", d).value;
+      if(!city || !inst || inst.length<3)return toast('Şehir ve en az 3 karakterli kurum adı gerekli');
+      const institution=await sb.from('institutions').insert({name:inst,city,created_by:ME.id});
+      if(institution.error && institution.error.code!=='23505'){check(institution);return;}
       check(await sb.from("hcps").insert({ owner_id: ME.id, name, spec: $("#hsp", d).value, inst: $("#hi", d).value.trim(), city: $("#hci", d).value.trim() }));
       d.remove(); toast("Hekim kaydedildi"); await loadAll(); vPaydaslar();
     };
@@ -477,7 +490,7 @@ function navItems() {
   const r = ME.job_role;
   const items = [];
   if (r === "avukat") items.push(["inceleme", "Hukuk incelemesi" + (D.reviewCount ? `<span class="badge-n">${D.reviewCount}</span>` : "")]);
-  items.push(["portal", "Sınavlarım"], ["mufredat", "Müfredat"]);
+  items.push(["portal", "Sınavlarım"], ["mufredat", "Müfredat"], ["ogrenme", "Öğrenme planım"], ["belgeler", "Kaynak belgeleri"]);
   if (r === "pjp") items.push(["paydaslar", "Paydaşlar"]);
   if (r === "urun_muduru") items.push(["ekip", "Ekip raporu"]);
   return items;
@@ -489,8 +502,9 @@ function route() {
   const page = allowed.includes(p) ? p : "portal";
   const tab = ["egitim", "kutuphane", "sinav"].includes(page) ? "portal" : page;
   $("#nav").innerHTML = navItems().map(([k, l]) => `<a href="#/${k}" class="${k === tab ? "active" : ""}">${l}</a>`).join("");
-  const views = { portal: vPortal, egitim: vEgitim, kutuphane: vKutuphane, mufredat: vMufredat, paydaslar: vPaydaslar, ekip: vEkip, inceleme: vInceleme, profil: vProfil, sinav: () => vSinav(arg) };
+  const views = { ogrenme: vOgrenme, belgeler: vBelgeler, portal: vPortal, egitim: vEgitim, kutuphane: vKutuphane, mufredat: vMufredat, paydaslar: vPaydaslar, ekip: vEkip, inceleme: vInceleme, profil: vProfil, sinav: () => vSinav(arg) };
   views[page]();
 }
 window.addEventListener("hashchange", () => { if (ME) { route(); window.scrollTo(0, 0); } });
 boot(async () => { await loadAll(); route(); });
+

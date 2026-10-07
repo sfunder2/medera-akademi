@@ -106,6 +106,18 @@ Kullanıcılar e-posta, şifre ve rolleriyle kayıt olur. Yeni hesaplar **onay b
 Hekim adları ve etkileşim notları kişisel veridir (KVKK). Gerçek verilerle kullanmadan önce şirketinizin bilgi güvenliği ve uyum ekibinden onay alın. Supabase projenizin bölgesini (ör. AB) buna göre seçin. Etkileşim notlarına hasta bilgisi yazılmamalıdır.
 
 ## Dosya yapısı
+
+## Yeni özelliklerin kurulumu
+
+Mevcut kurulumda `supabase/features_v3.sql` dosyasını `hardening.sql` sonrasında tek bir veritabanı işlemi içinde çalıştırın. Yeni kurulum sırası: `schema.sql`, `upgrade_v2.sql`, `hardening.sql`, `features_v3.sql`. Daha sonra yapay zekâ Edge Function dosyasını yeniden yayımlayın.
+
+- Atanan sınavların soruları, cevap anahtarları ve açıklamaları atama anında korunur. Daha sonraki düzenlemeler eski sonuçları değiştirmez. Bu özellik kurulduğu tarihten önce kaybolmuş sürümleri geri oluşturamaz.
+- Sınav ve müfredatların önceki sürümleri yönetim panelindeki **Sürümler** düğmesinden görüntülenir. **İşlem geçmişi** kullanıcı, içerik, atama ve hukuk onayı işlemlerini gösterir.
+- **Kaynak belgeleri** bölümünde ürün belgelerinin metinlerini özgün sayfa numaralarıyla ekleyin veya TXT dosyası içeriğini aktarın. Taslağı hukuk incelemesine gönderin; avukat veya yönetici onayladıktan sonra kaynaklı asistan belgeyi kullanabilir. PDF metnini sayfa sayfa aktarın; bu sürüm PDF OCR işlemi yapmaz. Kaynak bulunmadığında asistan bunu açıkça bildirir.
+- **Öğrenme planım**, tamamlanan resmi sınavların yanlış ve boş cevaplarından en fazla 100 tekrar sorusu oluşturur; kısa alıştırmalarda anında geri bildirim verir.
+- Hekim kaydında Türkiye'nin 81 ili seçilebilir. Başlangıç için 26 şehir hastanesi eklenmiştir; şehir seçtikten sonra listede olmayan bir kurum yazılarak yeni kurum da kaydedilebilir.
+- Şehir ve hastane başlangıç listeleri: [İçişleri Bakanlığı](https://www.icisleri.gov.tr/valilikler), [Sağlık Bakanlığı şehir hastaneleri listesi](https://camsakurasehir.saglik.gov.tr/TR-1203506/sehir-hastaneleri.html).
+
 ```
 index.html                 Kullanıcı uygulaması
 admin.html                 Yönetim paneli
@@ -119,4 +131,5 @@ supabase/upgrade_v2.sql    Roller, onay, hukuk incelemesi, duyurular, ekip rapor
 supabase/functions/ai/     Claude API aracısı (Edge Function)
 .nojekyll                  GitHub Pages'in dosyaları işlememesi için
 ```
+
 

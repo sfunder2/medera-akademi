@@ -185,19 +185,19 @@ async function boot(render, { adminOnly = false } = {}) {
 /* ---------- Yapay zekâ (Supabase Edge Function üzerinden) ---------- */
 const SYS = "Sen bir ilaç şirketinin tıbbi işler ekibi için çalışan eğitim asistanısın. Saha temsilcilerine ürünler, tedavi alanları ve klinik çalışmalar hakkında doğru, kaynağa dayalı, tarafsız ve Türkçe yanıt ver. Endikasyon dışı kullanım önerme, bireysel hasta için tedavi önerisi verme. Emin olmadığında bunu açıkça belirt ve kaynak uydurma.";
 
-async function ai({ system = SYS, messages, stream = false, onText, maxTokens = 2000 }) {
+async function ai({ system = SYS, messages, stream = false, onText, onSources, grounded = false, productId = null, maxTokens = 2000 }) {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) throw { code: "auth", message: "Oturum yok" };
   const res = await fetch(CFG.SUPABASE_URL.replace(/\/$/, "") + "/functions/v1/ai", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token, apikey: CFG.SUPABASE_ANON_KEY },
-    body: JSON.stringify({ system, messages, stream, max_tokens: maxTokens })
+    body: JSON.stringify({ system, messages, stream, grounded, product_id: productId, max_tokens: maxTokens })
   });
   if (!res.ok) {
     let m = ""; try { m = (await res.json()).error; } catch {}
     throw { code: res.status === 429 ? "rate_limited" : res.status === 404 ? "missing" : "http", message: m || "HTTP " + res.status };
   }
-  if (!stream) return (await res.json()).text || "";
+  if (!stream) { const data = await res.json(); if(onSources)onSources(data.sources || []); return data.text || ""; }
   const reader = res.body.getReader(); const dec = new TextDecoder();
   let buf = "", text = "";
   for (;;) {
@@ -254,3 +254,4 @@ function strip(items, cls = "") {
   return `<div class="strip ${cls}">${items.map(([v, l, c, meter]) =>
     `<div class="${c || ""}"><b>${v}</b><span>${l}</span>${meter !== undefined ? `<div class="meter"><i style="width:${meter}%"></i></div>` : ""}</div>`).join("")}</div>`;
 }
+
