@@ -34,6 +34,8 @@ Deno.serve(async (req) => {
   if (profiles[0]?.status !== "active") return json({ error: "Hesabınız etkin değil" }, 403);
 
   const key = Deno.env.get("ANTHROPIC_API_KEY");
+  const clone = req.clone();
+  try { const probe = await clone.json(); if (probe?.health === true) return json({ configured: !!key }); } catch { /* Normal validation below */ }
   if (!key) return json({ error: "Sunucuda ANTHROPIC_API_KEY tanımlı değil" }, 500);
 
   let body: { system?: string; messages?: { role: string; content: string }[]; stream?: boolean; max_tokens?: number; grounded?: boolean; product_id?: string | null };
@@ -95,5 +97,6 @@ Deno.serve(async (req) => {
   const text = (data.content ?? []).filter((b: { type: string }) => b.type === "text").map((b: { text: string }) => b.text).join("");
   return json({ text, sources: sources.map(({text: _text, ...citation})=>citation) });
 });
+
 
 

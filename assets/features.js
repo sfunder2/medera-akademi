@@ -13,8 +13,8 @@ async function showSourcePage(id,page) {
  try { const d=check(await sb.from('source_documents').select('*').eq('id',id).single());
  const p=d.pages.find(p=>p.page===page); if(!p) return toast('Sayfa bulunamadı');
  const url=safeSourceUrl(d.source_url);
- const box=dialog(`<h2>${esc(d.title)} · Sayfa ${page}</h2><p style="white-space:pre-wrap;margin:16px 0">${esc(p.text)}</p>${url?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Orijinal belgeyi aç</a>`:''}<div class="row end"><button class="btn close-source">Kapat</button></div>`,{wide:true});
- $('.close-source',box).onclick=()=>box.remove(); } catch{}
+ const box=dialog(`<h2>${esc(d.title)} · Sayfa ${page}</h2><p style="white-space:pre-wrap;margin:16px 0">${esc(p.text)}</p>${url?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Orijinal belgeyi aç</a>`:''}<div class="row end">${typeof qolRead==='function'?'<button class="btn ghost source-note">Bu sayfaya not ekle</button>':''}<button class="btn close-source">Kapat</button></div>`,{wide:true});
+ $('.close-source',box).onclick=()=>box.remove(); const note=$('.source-note',box);if(note)note.onclick=()=>{const notes=qolRead('notes',{}),key='document:'+id+':'+page;const n=dialog('<h2>Sayfa notum</h2><textarea id="sourceNote" rows="5" maxlength="4000"></textarea><p class="small">Bu cihazda otomatik kaydedilir.</p><button class="btn close">Kapat</button>');$('#sourceNote',n).value=notes[key]?.text||'';$('#sourceNote',n).oninput=e=>{notes[key]={title:d.title+' · s. '+page,text:e.target.value,href:'#/belgeler'};qolWrite('notes',notes);};$('.close',n).onclick=()=>n.remove();}; } catch{}
 }
 async function vBelgeler() {
  app.innerHTML='<div class="center"><span class="spin"></span></div>';
@@ -83,4 +83,5 @@ async function vOgrenme(){
  $$('[data-learn]').forEach(b=>b.onclick=()=>{const i=+b.dataset.learn,x=items[i],ok=+b.dataset.option===x.correct;$$('button',$('#practice-'+i)).forEach(n=>{n.disabled=ok;n.classList.toggle('right',ok&&+n.dataset.option===x.correct);});const f=$('#feedback-'+i);f.hidden=false;f.textContent=ok?'Doğru. '+(x.explanation||'Bu konuyu tekrar ettin.'):'Tekrar dene. Önce seçenekleri karşılaştır.';});
  }catch{app.innerHTML='<div class="panel">Öğrenme planı yüklenemedi.</div>';}
 }
+
 

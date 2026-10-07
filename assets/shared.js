@@ -222,6 +222,9 @@ async function aiJSON(prompt, maxTokens = 6000) {
 }
 function aiError(e) {
   if (!e) return "Yanıt alınamadı. Tekrar deneyin.";
+  if ((e.message || "").includes("ANTHROPIC_API_KEY")) return "AI bağlantısı kurulmamış. Yönetici Supabase Secrets bölümüne ANTHROPIC_API_KEY eklemeli.";
+  if (e.code === "auth") return "Oturumunuz sona erdi. Yeniden giriş yapın.";
+  if (e.name === "TypeError" || e.name === "AbortError") return "Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.";
   if (e.code === "rate_limited") return "Çok fazla istek gönderildi. Bir dakika bekleyip tekrar deneyin.";
   if (e.code === "missing") return "Yapay zekâ fonksiyonu bulunamadı. Supabase'e 'ai' fonksiyonunu yükleyin (README, adım 3).";
   if (e.code === "parse") return "Yapay zekâ yanıtı okunamadı. Tekrar deneyin.";
@@ -254,4 +257,5 @@ function strip(items, cls = "") {
   return `<div class="strip ${cls}">${items.map(([v, l, c, meter]) =>
     `<div class="${c || ""}"><b>${v}</b><span>${l}</span>${meter !== undefined ? `<div class="meter"><i style="width:${meter}%"></i></div>` : ""}</div>`).join("")}</div>`;
 }
+
 

@@ -1,0 +1,12 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const {JSDOM}=require('jsdom');const dom=new JSDOM('<main id="app"></main>',{url:'https://test.invalid/#/masam'});dom.window.HTMLElement.prototype.scrollIntoView=function(){};
+const $=(s,r=dom.window.document)=>r.querySelector(s),$$=(s,r=dom.window.document)=>[...r.querySelectorAll(s)];let fail=false;
+const c={window:dom.window,document:dom.window.document,location:dom.window.location,localStorage:dom.window.localStorage,app:$('#app'),$,$$,ME:{id:'a',role:'user'},D:{products:[],curricula:[],asg:[]},SYS:'Eğitim',esc:s=>String(s??'').replaceAll('<','&lt;'),toast(){},setTimeout,clearTimeout,AbortController,CFG:{SUPABASE_URL:'https://test.invalid',SUPABASE_ANON_KEY:'public'},fetch:async()=>({ok:true,json:async()=>({configured:false})}),sb:{auth:{getSession:async()=>({data:{session:{access_token:'test'}}})},from:()=>({select:()=>({eq:async()=>({data:[]})})})},ai:async()=>{if(fail)throw Error('network');return 'Kanıtınız nedir?';},aiError:e=>e.message,Blob,URL};
+vm.createContext(c);for(const file of ['qol','roleplay'])vm.runInContext(fs.readFileSync(__dirname+'/../assets/'+file+'.js','utf8'),c);
+(async()=>{
+ c.qolWrite('notes',{x:{text:'özel'}});c.ME.id='b';assert.deepEqual(JSON.parse(JSON.stringify(c.qolRead('notes',{}))),{});c.ME.id='a';assert.equal(c.qolRead('notes').x.text,'özel');
+ await c.vTools();await new Promise(r=>setTimeout(r,0));assert.match($('#toolsHealth').textContent,/henüz hazır değil/);
+ c.vRoleplay();await $('#rpStart').onclick();$('#rpAnswer').value='Taslağım';$('#rpAnswer').oninput();fail=true;await $('#rpSend').onclick();assert.equal($('#rpAnswer').value,'Taslağım');c.window.stopRoleplay();c.vRoleplay();$('#rpResume').onclick();assert.equal($('#rpAnswer').value,'Taslağım');assert.equal($('#rpTranscript').children.length,1);
+ fail=false;await $('#rpSend').onclick();assert.equal($('#rpTranscript').children.length,3);$('#rpPractice').onclick();assert.equal($('#rpTranscript').children.length,1);assert.match($('#rpHelp').textContent,/Taslağım/);assert.equal($('#rpFinish').disabled,true);$('#rpHint').onclick();assert.match($('#rpHelp').textContent,/onaylı kaynağa/);c.window.stopRoleplay();
+ console.log('PASS: account isolation, missing-key preflight, failed-answer preservation, reload resume, same-objection retry and source-safe hints');dom.window.close();
+})().catch(e=>{console.error(e);dom.window.close();process.exitCode=1});

@@ -45,6 +45,7 @@ function vPortal() {
   app.innerHTML = `
   <div class="page-head"><div class="grow"><h1>Merhaba, ${esc(ME.full_name || "")}</h1><p class="small" style="margin-bottom:6px"><span class="pill">${roleLabel(ME.job_role)}</span></p>
     <p class="muted">Atanan sınavlarınızı tamamlayın, ürün bilgilerine ulaşın ve sorularınızı yapay zekâ asistanına sorun.</p></div></div>
+  <div class="panel"><h2>Bugünkü çalışma</h2><p>10 dakikalık tekrar, eksiklerinize uygun bir çalışma ve kısa bir itiraz pratiği.</p><a class="btn" href="#/masam">Çalışma masamı aç</a></div>
   ${myStrip(st)}
   ${D.anns.length ? `<div class="panel" style="margin-bottom:16px"><h2>Duyurular</h2>
     ${D.anns.slice(0, 5).map(a => `<div class="ann ${a.pinned ? "pin" : ""}"><h3>${a.pinned ? "📌 " : ""}${esc(a.title)}</h3>
@@ -141,7 +142,7 @@ async function vSinav(id) {
     const r = await sb.rpc("exam_review", { p_assignment: id });
     reviews[id] = r.data || { answers: [], explanations: [] };
   }
-  if (sub.ansFor !== id) { sub.ans = []; sub.ansFor = id; }
+  if (sub.ansFor !== id) { sub.ans = qolRead("exam:"+id, []); sub.ansFor = id; }
   const ans = done ? (a.answers || []) : sub.ans;
   const key = reviews[id] || {};
   app.innerHTML = `
@@ -164,7 +165,7 @@ async function vSinav(id) {
     ${done ? (ex.is_practice ? `<button class="btn ghost" id="retry">Yeniden çöz</button>` : "")
       : `<span class="muted small">${ans.filter(x => x !== undefined && x !== null).length}/${ex.questions.length} yanıtlandı</span><button class="btn" id="finish">Sınavı gönder</button>`}
   </div>`;
-  $$(".opt:not([disabled])").forEach(b => b.onclick = () => { ans[+b.dataset.q] = +b.dataset.o; vSinav(id); });
+  $$(".opt:not([disabled])").forEach(b => b.onclick = () => { ans[+b.dataset.q] = +b.dataset.o; qolWrite("exam:"+id,ans); vSinav(id); });
   const fin = $("#finish");
   if (fin) fin.onclick = async () => {
     const answered = ans.filter(x => x !== undefined && x !== null).length;
@@ -173,12 +174,12 @@ async function vSinav(id) {
     busyBtn(fin, true, "Gönderiliyor");
     const r = await sb.rpc("submit_exam", { p_assignment: id, p_answers: ex.questions.map((_, i) => ans[i] ?? null) });
     if (r.error) { busyBtn(fin, false, "Sınavı gönder"); toast(r.error.message); return; }
-    toast(`Sınav gönderildi: %${r.data}`); await loadAll(); window.scrollTo(0, 0); vSinav(id);
+    qolDelete("exam:"+id); toast(`Sınav gönderildi: %${r.data}`); await loadAll(); window.scrollTo(0, 0); vSinav(id);
   };
   const rt = $("#retry");
   if (rt) rt.onclick = async () => {
     check(await sb.from("exam_assignments").update({ status: "pending", score: null, answers: null, completed_at: null }).eq("id", id));
-    delete reviews[id]; sub.ans = []; await loadAll(); vSinav(id);
+    qolDelete("exam:"+id); delete reviews[id]; sub.ans = []; await loadAll(); vSinav(id);
   };
 }
 
@@ -260,10 +261,11 @@ function vMufredat() {
   <div class="page-head"><div class="grow"><h1>Müfredat</h1><p class="muted">Ekibiniz için hazırlanan yapılandırılmış eğitim planları.</p></div>
     <select id="fa" class="auto"><option value="">Tüm tedavi alanları</option>${AREAS.map(a => `<option ${fa === a ? "selected" : ""}>${a}</option>`).join("")}</select>
     <select id="fp" class="auto"><option value="">Tüm ürünler</option>${prods.map(p => `<option ${fp === p ? "selected" : ""}>${esc(p)}</option>`).join("")}</select></div>
-  ${list.length ? list.map(c => `<div class="panel">
+  ${list.length ? list.map(c => `<div class="panel" data-curriculum="${esc(c.id)}">
       <h2>${esc(c.title)}</h2><p class="muted small">${esc(c.area || "")}${c.products ? ` · ${esc(c.products.name)}` : ""} · ${c.weeks || c.modules.length} hafta · ${c.modules.length} modül</p>
       ${renderModules(c.modules)}</div>`).join("")
   : `<div class="panel"><div class="empty"><div class="ic">${icon.book}</div><h3>Henüz müfredat yok</h3><p>Yöneticiniz bir müfredat yayımladığında burada görünür.</p></div></div>`}`;
+  $$("[data-curriculum]").forEach(panel=>{const completed=qolRead('modules:'+panel.dataset.curriculum,[]);$$('.module',panel).forEach((m,i)=>{const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=completed.includes(i);label.append(input,document.createTextNode(' Bu modülü çalıştım (bu cihazda kaydedilir)'));m.append(label);input.onchange=()=>{const at=completed.indexOf(i);if(input.checked&&at<0)completed.push(i);if(!input.checked&&at>=0)completed.splice(at,1);qolWrite('modules:'+panel.dataset.curriculum,completed);};});});
   $("#fa").onchange = e => { sub.cArea = e.target.value; vMufredat(); };
   $("#fp").onchange = e => { sub.cProd = e.target.value; vMufredat(); };
 }
@@ -490,7 +492,7 @@ function navItems() {
   const r = ME.job_role;
   const items = [];
   if (r === "avukat") items.push(["inceleme", "Hukuk incelemesi" + (D.reviewCount ? `<span class="badge-n">${D.reviewCount}</span>` : "")]);
-  items.push(["portal", "Sınavlarım"], ["mufredat", "Müfredat"], ["ogrenme", "Öğrenme planım"], ["belgeler", "Kaynak belgeleri"]);
+  items.push(["masam", "Çalışma masam"], ["yanlislar", "Yanlışlarım"], ["portal", "Sınavlarım"], ["mufredat", "Müfredat"], ["ogrenme", "Öğrenme planım"], ["belgeler", "Kaynak belgeleri"]);
   if (r === "pjp") items.push(["paydaslar", "Paydaşlar"], ["duello", "Düellolar"], ["roleplay", "Hekim simülasyonu"]);
   if (r === "avukat") items.push(["duellosoru", "Düello soruları"]);
   if (r === "urun_muduru") items.push(["ekip", "Ekip raporu"], ["beceri", "Beceri haritası"]);
@@ -507,8 +509,10 @@ function route() {
   const page = allowed.includes(p) ? p : "portal";
   const tab = ["egitim", "kutuphane", "sinav"].includes(page) ? "portal" : page;
   $("#nav").innerHTML = navItems().map(([k, l]) => `<a href="#/${k}" class="${k === tab ? "active" : ""}">${l}</a>`).join("");
-  const views = { sahacalisma: vField, gelisim: () => vField("plan"), degisiklik: vFieldNotices, atolye: () => vField("manage"), beceri: vFieldHeatmap, duello: vDuello, duellosoru: vDuelQuestions, ogrenme: vOgrenme, belgeler: vBelgeler, portal: vPortal, egitim: vEgitim, kutuphane: vKutuphane, mufredat: vMufredat, paydaslar: vPaydaslar, ekip: vEkip, inceleme: vInceleme, profil: vProfil, sinav: () => vSinav(arg) };
-  if (page === "roleplay") vRoleplay(); else views[page]();
+  const views = { masam: vTools, yanlislar: vMistakes, sahacalisma: vField, gelisim: () => vField("plan"), degisiklik: vFieldNotices, atolye: () => vField("manage"), beceri: vFieldHeatmap, duello: vDuello, duellosoru: vDuelQuestions, ogrenme: vOgrenme, belgeler: vBelgeler, portal: vPortal, egitim: vEgitim, kutuphane: vKutuphane, mufredat: vMufredat, paydaslar: vPaydaslar, ekip: vEkip, inceleme: vInceleme, profil: vProfil, sinav: () => vSinav(arg) };
+  const rendered = page === "roleplay" ? vRoleplay() : views[page]();
+  Promise.resolve(rendered).then(()=>{if(location.hash.replace(/^#\/?/, "").split("/")[0] === p || !location.hash) qolPageTools(page);}).catch(e=>console.error(e));
+  if (!["portal","masam","yanlislar","profil"].includes(page)) qolWrite("lastPage", location.hash);
 }
 window.addEventListener("hashchange", () => { if (ME) { route(); window.scrollTo(0, 0); } });
 boot(async () => { await loadAll(); route(); });
