@@ -22,19 +22,15 @@
         <button class="icon-btn" id="themeBtn" aria-label="Tema değiştir" title="Tema değiştir">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
         </button>
-        <button class="icon-btn" id="userBtn" title="Görünen adı değiştir"><span id="userName"></span></button>
+        <a class="icon-btn" id="userBtn" href="#/profil" title="Profilim" hidden><span id="userName"></span></a>
         <button class="icon-btn" id="signOut" hidden>Çıkış</button>
       </div>
     </div>
-    <nav class="tabs" aria-label="Ana menü">
-      <a href="#/portal" data-tab="portal">Sınavlarım</a>
-      <a href="#/mufredat" data-tab="mufredat">Müfredat</a>
-      <a href="#/paydaslar" data-tab="paydaslar">Paydaşlar</a>
-    </nav>
+    <nav class="tabs" id="nav" aria-label="Ana menü"></nav>
   </div>
 </header>
 <main><div class="wrap" id="app"></div></main>
-<footer><div class="wrap"><span>Medera Akademi — saha ekipleri için eğitim, sınav ve bilgi merkezi</span><span>v2.0</span></div></footer>
+<footer><div class="wrap"><span>Medera Akademi — saha ekipleri için eğitim, sınav ve bilgi merkezi</span><span>v3.0</span></div></footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>

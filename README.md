@@ -18,7 +18,7 @@ Güvenlik notları: Cevap anahtarları ayrı tabloda tutulur ve kullanıcılar a
 
 ### 1. Supabase projesi
 1. https://supabase.com adresinde ücretsiz hesap açın ve **New project** ile proje oluşturun.
-2. Sol menüden **SQL Editor → New query** açın, `supabase/schema.sql` dosyasının tamamını yapıştırıp **Run**'a basın. (Bu dosyayı yalnızca bir kez çalıştırın.)
+2. Sol menüden **SQL Editor → New query** açın, `supabase/schema.sql` dosyasının tamamını yapıştırıp **Run**'a basın. Ardından aynı şekilde `supabase/upgrade_v2.sql` dosyasını çalıştırın. (`schema.sql` yalnızca bir kez çalıştırılır; `upgrade_v2.sql` tekrar çalıştırılabilir.)
 
 ### 2. GitHub deposu ve Pages
 1. GitHub'da yeni bir depo oluşturun (örn. `medera-akademi`).
@@ -60,21 +60,38 @@ Supabase'in yerleşik e-posta servisi saatte birkaç e-postayla sınırlıdır. 
 Yalnızca şirket e-postalarına izin vermek için `schema.sql` içindeki `handle_new_user` fonksiyonundaki yorum satırlarını açıp alan adınızı yazın ve fonksiyonu SQL Editor'de yeniden çalıştırın.
 
 ### 6. İlk yönetici
-Siteye kendi e-postanızla bir kez giriş yapın. Ardından SQL Editor'de şunu çalıştırın:
+Siteden **Kayıt ol** sekmesiyle hesabınızı oluşturun. Ardından SQL Editor'de şunu çalıştırın:
 ```sql
-update public.profiles set role = 'admin' where email = 'sizin@epostaniz.com';
+update public.profiles set role = 'admin', status = 'active' where email = 'sizin@epostaniz.com';
 ```
 Sayfayı yenilediğinizde üst menüde **Yönetim paneli** bağlantısı görünür. Diğer yöneticileri panelden atayabilirsiniz.
 
 ---
 
+## Roller ve hesaplar
+
+Kullanıcılar e-posta, şifre ve rolleriyle kayıt olur. Yeni hesaplar **onay bekliyor** durumunda başlar ve yönetici onaylayana kadar hiçbir içeriğe erişemez. Rol kullanıcı tarafından seçildiği için yönetici onay sırasında rolü kontrol etmeli, gerekirse düzeltmelidir.
+
+| Rol | Ne görür / ne yapar |
+|---|---|
+| **PJP** | Sınavlar, kütüphane ve yapay zekâ asistanı, müfredat, hekim ve etkileşim kaydı (Paydaşlar) |
+| **Ürün Müdürü** | Sınavlar, müfredat ve **Ekip raporu**: kendi ürünlerine atanmış PJP'lerin sınav başarısı ve etkileşim sayıları. Hekim adlarını görmez. |
+| **Avukat** | Sınavlar, müfredat ve **Hukuk incelemesi**: yayın öncesi içerikleri onaylar ya da gerekçeyle reddeder. |
+| **Yönetici** (ayrı yetki) | Yönetim paneli. Herhangi bir iş rolündeki kullanıcı yönetici yapılabilir. |
+
+**Hukuk onayı (MLR):** Sınavlar ve müfredatlar taslak → hukuk incelemesi → onay akışından geçer. Onaysız sınav atanamaz, onaysız müfredat yayımlanamaz; bu kurallar veritabanında zorunludur. Onaylı içerik düzenlenirse onay otomatik düşer. Henüz avukat yoksa yönetici de onay verebilir.
+
+**E-posta doğrulaması:** Supabase varsayılan olarak kayıtta doğrulama e-postası gönderir. Yerleşik e-posta servisi saatte birkaç e-postayla sınırlıdır; ekibe açmadan önce kendi SMTP sunucunuzu tanımlayın (Authentication → Emails → SMTP Settings).
+
 ## Yönetim paneli
 
-- **Genel bakış:** Kullanıcı ve sınav sayıları, tamamlama ve başarı oranları, son tamamlananlar, geciken atamalar.
-- **Kullanıcılar:** Arama, kullanıcı başına sınav ve puan özeti, ürün atama, yönetici yetkisi verme ya da kaldırma.
+- **Genel bakış:** Bekleyen işler (onay bekleyen kullanıcılar, hukuk incelemesindeki içerikler), rol dağılımı, tamamlama ve başarı oranları, geciken atamalar.
+- **Kullanıcılar:** Onay bekleyen / etkin / devre dışı filtreleri, rol değiştirme, onaylama, erişimi kapatma, ürün atama, yönetici yetkisi.
+- **Hekimler:** Tüm temsilcilerin kaydettiği hekimler; temsilci, uzmanlık ve şehir filtresi; birden fazla temsilcinin kaydettiği hekimleri işaretleme; CSV.
+- **Duyurular:** Herkese ya da belirli bir role duyuru, sabitleme.
 - **Ürünler:** Ürün ekleme, düzenleme, silme. Ürün notları yapay zekâ asistanına bağlam olarak gider.
-- **Sınavlar:** Yapay zekâyla taslak üretme ya da boş başlama, soru düzenleyici (sıralama, doğru şık, açıklama), son tarihli toplu atama, sonuçlar, sıfırlama ve CSV dışa aktarma.
-- **Müfredat:** Yapay zekâyla taslak üretme, modülleri düzenleme, yayımlama ya da yayından kaldırma.
+- **Sınavlar:** Yapay zekâyla taslak, soru düzenleyici, hukuk incelemesine gönderme, role göre toplu atama ("Tüm PJP"), son tarih, sonuçlar ve CSV.
+- **Müfredat:** Yapay zekâyla taslak, modül düzenleme, hukuk incelemesi, yayımlama.
 - **Saha aktivitesi:** Tüm temsilcilerin hekim etkileşimleri, temsilci filtresi, CSV dışa aktarma.
 
 ## Kullanıcı uygulaması
@@ -98,6 +115,7 @@ assets/shared.js           Giriş, Supabase istemcisi, yapay zekâ yardımcılar
 assets/app.js              Kullanıcı uygulaması mantığı
 assets/admin.js            Yönetim paneli mantığı
 supabase/schema.sql        Veritabanı şeması ve güvenlik kuralları
+supabase/upgrade_v2.sql    Roller, onay, hukuk incelemesi, duyurular, ekip raporu
 supabase/functions/ai/     Claude API aracısı (Edge Function)
 .nojekyll                  GitHub Pages'in dosyaları işlememesi için
 ```

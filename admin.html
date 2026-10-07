@@ -22,22 +22,24 @@
         <button class="icon-btn" id="themeBtn" aria-label="Tema değiştir">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
         </button>
-        <button class="icon-btn" id="userBtn"><span id="userName"></span></button>
+        <a class="icon-btn" id="userBtn" href="./#/profil" title="Profilim" hidden><span id="userName"></span></a>
         <button class="icon-btn" id="signOut" hidden>Çıkış</button>
       </div>
     </div>
-    <nav class="tabs" aria-label="Yönetim menüsü">
+    <nav class="tabs" aria-label="Yönetim menüsü" hidden>
       <a href="#/genel" data-tab="genel">Genel bakış</a>
-      <a href="#/kullanicilar" data-tab="kullanicilar">Kullanıcılar</a>
+      <a href="#/kullanicilar" data-tab="kullanicilar">Kullanıcılar<span class="badge-n" id="pendingBadge" hidden></span></a>
+      <a href="#/hekimler" data-tab="hekimler">Hekimler</a>
       <a href="#/urunler" data-tab="urunler">Ürünler</a>
       <a href="#/sinavlar" data-tab="sinavlar">Sınavlar</a>
       <a href="#/mufredat" data-tab="mufredat">Müfredat</a>
       <a href="#/saha" data-tab="saha">Saha aktivitesi</a>
+      <a href="#/duyurular" data-tab="duyurular">Duyurular</a>
     </nav>
   </div>
 </header>
 <main><div class="wrap" id="app"></div></main>
-<footer><div class="wrap"><span>Medera Akademi yönetim paneli</span><span>v2.0</span></div></footer>
+<footer><div class="wrap"><span>Medera Akademi yönetim paneli</span><span>v3.0</span></div></footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
