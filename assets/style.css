@@ -82,7 +82,7 @@ p{margin:0}
 
 .field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
 .field label{font-size:13px;font-weight:600}
-input[type=text],input[type=email],input[type=search],input[type=date],select,textarea{width:100%;border:1px solid var(--line);background:var(--surface2);border-radius:var(--radius-s);padding:10px 12px;font-size:14px}
+input[type=text],input[type=email],input[type=password],input[type=search],input[type=date],select,textarea{width:100%;border:1px solid var(--line);background:var(--surface2);border-radius:var(--radius-s);padding:10px 12px;font-size:14px}
 textarea{resize:vertical;min-height:80px}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .row > .grow{flex:1;min-width:180px}
@@ -156,4 +156,11 @@ footer{border-top:1px solid var(--line);padding:18px 0;font-size:12px;color:var(
 footer .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-weight:600;font-size:14px;z-index:60;max-width:90vw}
 
+.linkbtn{background:none;border:0;color:var(--brand);font-weight:600;font-size:14px;padding:0;text-decoration:underline;text-underline-offset:3px}
+.role-chip{font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px;background:rgba(255,255,255,.14);color:#fff}
+.ann{border-left:3px solid var(--amber);padding:4px 0 4px 14px;margin-top:12px}
+.ann.pin{border-left-color:var(--brand)}
+.ann p{white-space:pre-wrap;font-size:14px;margin-top:2px}
+.review-card{border:1px solid var(--line);border-radius:var(--radius-s);padding:16px;margin-top:12px;background:var(--surface2)}
+.badge-n{display:inline-grid;place-items:center;min-width:18px;height:18px;border-radius:9px;background:var(--amber);color:#fff;font-size:11px;font-weight:800;padding:0 5px;margin-left:6px}
 [hidden]{display:none !important}
