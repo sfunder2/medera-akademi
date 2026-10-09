@@ -177,3 +177,10 @@ Kaynak sayfasının metni değişirse o sayfaya bağlı çalışmalar PJP ekran�
 ### Kontroller
 
 `npm install` ve `npm run test:field`. Veritabanı testleri PGlite ile izole PostgreSQL üzerinde çalışır; canlı Supabase projesine bağlanmaz. Yetki izolasyonu, hukuk onayı, altı içerik türü, kaynak değişikliği, sunucuda puanlama, eski cevap anahtarlarının saklanması ve okundu kayıtları doğrulanır. Mevcut testler ayrıca `node tests/features.test.cjs` ve `node tests/roleplay.test.cjs` ile çalışır.
+
+---
+
+## Mobil uygulama
+
+- **Telefona yükleme (en kolay):** Site bir PWA'dır. Android'de Chrome ile açıp menüden **Uygulamayı yükle**, iPhone'da Safari'de **Paylaş → Ana Ekrana Ekle** seçin.
+- **Android APK:** `android/` klasöründe siteyi tam ekran açan bir Android uygulaması vardır. Yükleme, adres çubuğunu gizleme ve yeniden derleme adımları `android/README.md` içindedir.

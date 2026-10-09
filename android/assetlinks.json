@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.medera.akademi",
+    "sha256_cert_fingerprints": ["98:A5:D3:C1:12:B5:1D:34:F0:26:F5:17:61:0A:7E:49:DD:96:5C:59:7D:63:54:1B:46:16:18:A6:B3:C1:B6:EE"]
+  }
+}]
