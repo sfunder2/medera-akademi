@@ -1,2 +1,2 @@
-.qol-toolbar{display:flex;gap:8px;flex-wrap:wrap}#searchResults .item{flex-wrap:wrap}#globalSearch{width:100%;margin:12px 0}button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid var(--brand,#345);outline-offset:3px}
+#searchResults .item{flex-wrap:wrap}#globalSearch{width:100%;margin:12px 0}button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid var(--brand,#345);outline-offset:3px}
 @media(max-width:640px){.btn{min-height:44px}.row{flex-wrap:wrap}#nav{overflow-x:auto;white-space:nowrap}#rpTranscript{max-height:45vh!important}.qol-toolbar .btn{flex:1}.panel pre{overflow-wrap:anywhere}.tablewrap{overflow:auto}}
