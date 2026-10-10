@@ -201,6 +201,17 @@ Mevcut veritabanına `supabase/field_signals_v7.sql` dosyasını SQL Editor'de b
 - **Yan etki bildir:** Üst çubuktaki düğme her sayfada görünür. Temsilci ne olduğunu, ilacı ve ciddiyeti girer; hasta için yalnızca yaş grubu ve cinsiyet istenir. Bildirim bir takip numarası alır, yalnızca bildiren kişi ve yöneticiler görebilir. Tıbbi birim yönetim panelindeki **Yan etki bildirimleri** sayfasından bildirimi incelemeye alır, not yazar ve kapatır; temsilci durumu Ben → Yan etki bildirimlerim bölümünde izler.
 - **E-posta ile anında haber almak için (önerilir):** Supabase panelinde **Database → Webhooks** bölümünden `pv_reports` tablosundaki `INSERT` olayları için tıbbi birimin kullandığı e-posta veya bildirim servisine bir webhook tanımlayın. Uygulama bu ayar olmadan da çalışır; bildirimler yönetim panelinde bekler.
 
+### Çevrimdışı çalışma
+
+Uygulama zayıf veya hiç bağlantı olmayan yerlerde (hastane alt katları, radyoloji, kalın duvarlı poliklinikler) çalışmaya devam eder. Veritabanında değişiklik gerekmez.
+
+- **Okuma:** Açılan her sayfanın verisi cihazda (IndexedDB) saklanır. Bağlantı yoksa ya da 8 saniyede cevap gelmezse son kopya gösterilir. Üstte "Çevrimdışısınız" şeridi çıkar.
+- **Arka planda indirme:** Bağlantı varken, oturum açıldıktan birkaç saniye sonra kaynak belgeler, tekrar soruları, saha senaryoları, sınav açıklamaları ve yan etki bildirimleri sessizce indirilir (en fazla 6 saatte bir). Böylece hiç açılmamış sayfalar da çevrimdışı çalışır.
+- **Soğuk açılış:** Uygulama dosyaları ve Supabase kütüphanesi service worker ile cihazda tutulur. Uygulama internetsiz de açılır; süresi dolmuş oturum çevrimdışıyken yenilenmeye çalışılmaz, saklı oturumla devam edilir.
+- **Gönderim kuyruğu:** Çevrimdışıyken yapılan sınav gönderimi, ziyaret kaydı (itiraz etiketleriyle) ve yan etki bildirimi cihazda bekler. Bağlantı gelince, uygulamaya dönüldüğünde veya dakikada bir otomatik gönderilir. Kayıtlara cihazda kimlik verildiği için bağlantı gönderim sırasında koparsa çift kayıt oluşmaz. Sunucunun reddettiği kayıtlar şeritte "gönderilemedi" olarak listelenir.
+- **İnternet gerektirenler:** Yapay zekâ asistanı, hekim görüşmesi, bilgi yarışması, saha senaryosu çözme ve yeni hekim ekleme. Bunlar çevrimdışıyken açık bir uyarı verir.
+- **Gizlilik:** Cihazdaki veriler oturum açan kullanıcıya bağlıdır ve çıkış yapınca ya da Ben → Notlarım ve favorilerim → "Bu cihazdaki kişisel kayıtlarımı temizle" ile silinir. Ortak cihazlarda çıkış yapılmalıdır.
+
 ### Demo
 
 `demo.html` giriş gerektirmeyen bir tanıtım sürümüdür: https://sfunder2.github.io/medera-akademi/demo.html
