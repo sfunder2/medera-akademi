@@ -74,7 +74,7 @@ Kullanıcılar e-posta, şifre ve rolleriyle kayıt olur. Yeni hesaplar **onay b
 
 | Rol | Ne görür / ne yapar |
 |---|---|
-| **PJP** | Sınavlar, kütüphane ve yapay zekâ asistanı, müfredat, hekim ve etkileşim kaydı (Paydaşlar) |
+| **PJP** | Sınavlar, kütüphane ve yapay zekâ asistanı, müfredat, hekim ve etkileşim kaydı (Hekimlerim) |
 | **Ürün Müdürü** | Sınavlar, müfredat ve **Ekip raporu**: kendi ürünlerine atanmış PJP'lerin sınav başarısı ve etkileşim sayıları. Hekim adlarını görmez. |
 | **Avukat** | Sınavlar, müfredat ve **Hukuk incelemesi**: yayın öncesi içerikleri onaylar ya da gerekçeyle reddeder. |
 | **Yönetici** (ayrı yetki) | Yönetim paneli. Herhangi bir iş rolündeki kullanıcı yönetici yapılabilir. |
@@ -99,7 +99,7 @@ Kullanıcılar e-posta, şifre ve rolleriyle kayıt olur. Yeni hesaplar **onay b
 - **Sınavlarım:** Kişisel ve ekip istatistikleri, atanan sınavlar, yapay zekâyla pratik sınavı oluşturma, sonuç inceleme.
 - **Kütüphane:** Atanan ürünler ve konu bağlamı seçilebilen, akışlı yanıt veren yapay zekâ asistanı.
 - **Müfredat:** Yayımlanmış eğitim planları.
-- **Paydaşlar:** Hekim kaydı, arama ve filtreler, etkileşim geçmişi, ürün bazında dağılım.
+- **Hekimlerim** (eski adı Paydaşlar): Hekim kaydı, arama ve filtreler, etkileşim geçmişi, ürün bazında dağılım.
 
 ## Uyumluluk
 
@@ -136,7 +136,7 @@ supabase/functions/ai/     Claude API aracısı (Edge Function)
 
 ## PJP bölge düelloları
 
-Mevcut veritabanına supabase/duels_v4.sql dosyasını eatures_v3.sql sonrasında tek işlem içinde uygulayın. PJP kullanıcıları **Düellolar** menüsünden Karadeniz, Akdeniz, Marmara, İç Anadolu veya Ege bölgelerini seçer.
+Mevcut veritabanına supabase/duels_v4.sql dosyasını eatures_v3.sql sonrasında tek işlem içinde uygulayın. PJP kullanıcıları **Pratik → Bilgi yarışması** menüsünden Karadeniz, Akdeniz, Marmara, İç Anadolu veya Ege bölgelerini seçer.
 
 - Aylık sezon; her düelloda rakip analizi, ürün bilgisi, ilaç bilgisi, hekim görüşmesi ve saha planlama kategorilerinden birer soru.
 - Soru başına 30 saniye; doğru cevap 100 + kalan süreye göre en fazla 50 hız puanı. Yanlış/süre aşımı 0.
@@ -177,3 +177,23 @@ Kaynak sayfasının metni değişirse o sayfaya bağlı çalışmalar PJP ekran�
 ### Kontroller
 
 `npm install` ve `npm run test:field`. Veritabanı testleri PGlite ile izole PostgreSQL üzerinde çalışır; canlı Supabase projesine bağlanmaz. Yetki izolasyonu, hukuk onayı, altı içerik türü, kaynak değişikliği, sunucuda puanlama, eski cevap anahtarlarının saklanması ve okundu kayıtları doğrulanır. Mevcut testler ayrıca `node tests/features.test.cjs` ve `node tests/roleplay.test.cjs` ile çalışır.
+
+---
+
+## Kullanıcı arayüzü
+
+Uygulama dört sekmeden oluşur; telefonda alt menüde, bilgisayarda üstte görünür:
+
+| Sekme | İçindekiler |
+|---|---|
+| **Bugün** | Sıradaki adım (en yakın tarihli sınav ya da bekleyen inceleme), bugün yapılacaklar, duyurular |
+| **Öğren** | Eğitim, ürün, belge ve notlarda tek arama; yapay zekâ asistanı; müfredat, kütüphane ve kaynak belgeleri |
+| **Pratik** | Sınavlar, hekim görüşmesi, bilgi yarışması (Düello), yanlışlarım, tekrar soruları, saha senaryoları |
+| **Ben** | İlerleme, hekimlerim, rol görevleri (hukuk incelemesi, ekip raporu, içerik atölyesi), notlar ve favoriler, profil, tema, çıkış |
+
+---
+
+## Mobil uygulama
+
+- **Telefona yükleme (en kolay):** Site bir PWA'dır. Android'de Chrome ile açıp menüden **Uygulamayı yükle**, iPhone'da Safari'de **Paylaş → Ana Ekrana Ekle** seçin.
+- **Android APK:** `android/` klasöründe siteyi tam ekran açan bir Android uygulaması vardır. Yükleme, adres çubuğunu gizleme ve yeniden derleme adımları `android/README.md` içindedir.

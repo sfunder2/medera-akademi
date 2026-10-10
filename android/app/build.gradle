@@ -1,0 +1,48 @@
+plugins { id "com.android.application" }
+
+// Sitenin adresi: uygulama bu adresi Chrome üzerinden tam ekran açar (Trusted Web Activity).
+def siteHost = "sfunder2.github.io"
+def siteUrl = "https://sfunder2.github.io/medera-akademi/"
+
+android {
+    namespace "com.medera.akademi"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.medera.akademi"
+        minSdk 23
+        targetSdk 35
+        versionCode 1
+        versionName "1.0"
+        manifestPlaceholders = [hostName: siteHost, launchUrl: siteUrl]
+        resValue "string", "asset_statements",
+            "[{\\\"relation\\\":[\\\"delegate_permission/common.handle_all_urls\\\"],\\\"target\\\":{\\\"namespace\\\":\\\"web\\\",\\\"site\\\":\\\"https://${siteHost}\\\"}}]"
+    }
+
+    // İmza bilgileri ortam değişkenlerinden okunur; anahtar dosyası depoya konmaz.
+    signingConfigs {
+        release {
+            def ks = System.getenv("MEDERA_KEYSTORE")
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv("MEDERA_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("MEDERA_KEY_ALIAS") ?: "medera"
+                keyPassword System.getenv("MEDERA_KEY_PASSWORD") ?: System.getenv("MEDERA_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (System.getenv("MEDERA_KEYSTORE")) signingConfig signingConfigs.release
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation "com.google.androidbrowserhelper:androidbrowserhelper:2.5.0"
+}
