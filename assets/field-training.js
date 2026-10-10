@@ -1,5 +1,5 @@
 /* Source-approved field exercises and durable learning routes. */
-const FIELD_KINDS={objection:'İtiraz kartları',branch:'Dallanan görüşmeler',errors:'Hatalı sunumu bul',comparison:'Ürün karşılaştırmaları',visit:'Ziyaret hazırlığı',update:'Ürün güncellemeleri'};
+const FIELD_KINDS={objection:'İtiraz kartları',branch:'Dallanan görüşmeler',errors:'Hatalı sunumu bul',comparison:'Ürün karşılaştırmaları',visit:'Ziyaret hazırlığı',update:'Mikro eğitim'};
 const FIELD_SKILLS=['Tıbbi doğruluk','Kanıt kullanımı','İtiraz karşılama','Dengeli anlatım','Soru sorma'];
 let fieldGeneration=0;
 const fieldProducts=()=>typeof A!=='undefined'?A.products:D.products;
@@ -8,16 +8,19 @@ const fieldReviewer=()=>ME.role==='admin'||ME.job_role==='avukat';
 function fieldFailure(e){return `<div class="panel"><h2>Çalışma alanı açılamadı</h2><p>${esc(e.message||'Bağlantı hatası')}</p><p class="muted">Yeni çalışma modülü henüz etkinleştirilmemiş olabilir. Diğer bölümleri kullanabilirsiniz.</p><button class="btn ghost" onclick="vField()">Tekrar dene</button></div>`;}
 async function fieldRPC(name,args={}){const r=await sb.rpc(name,args);if(r.error)throw r.error;return r.data;}
 async function vField(mode='library'){
+ // Bugün listesinden açılan mikro eğitim doğrudan başlar.
+ if(mode==='library'&&globalThis.fieldRunNext){const id=globalThis.fieldRunNext;globalThis.fieldRunNext=null;return fieldRun(id);}
  const generation=++fieldGeneration;
  app.innerHTML='<div class="center"><span class="spin"></span></div>';
  try{
  const [units,history]=await Promise.all([fieldRPC('field_list',{p_manage:mode==='manage'}),fieldRPC('field_history')]);
  if(generation!==fieldGeneration)return;
  const title=mode==='manage'?'İçerik atölyesi':mode==='plan'?'Kişisel gelişim rotam':'Saha senaryoları';
- app.innerHTML=`<div class="page-head"><div class="grow"><h1>${title}</h1><p class="muted">Onaylı kaynaklarla kısa alıştırmalar, hazırlık kartları ve gelişim takibi.</p></div>${mode==='manage'&&fieldManager()?'<button class="btn" id="fieldNew">İçerik hazırla</button>':''}</div>
+ app.innerHTML=`<div class="page-head"><div class="grow"><h1>${title}</h1><p class="muted">Onaylı kaynaklarla kısa alıştırmalar, hazırlık kartları ve gelişim takibi.</p></div>${mode==='manage'&&fieldManager()?'<button class="btn ghost" id="fieldMicro">Yayından mikro eğitim üret</button><button class="btn" id="fieldNew">İçerik hazırla</button>':''}</div>
  <div class="seg"><button data-field="library">Çalışmalar</button><button data-field="plan">Gelişim rotam</button><button data-field="notices">Ürün değişiklikleri</button>${fieldManager()||fieldReviewer()?'<button data-field="manage">İçerik atölyesi</button>':''}${fieldManager()?'<button data-field="heatmap">Beceri haritası</button>':''}</div><div id="fieldBody"></div>`;
  $$('[data-field]').forEach(b=>{b.classList.toggle('on',b.dataset.field===mode);b.onclick=()=>b.dataset.field==='notices'?vFieldNotices():b.dataset.field==='heatmap'?vFieldHeatmap():vField(b.dataset.field);});
  if($('#fieldNew'))$('#fieldNew').onclick=()=>fieldEditor();
+ if($('#fieldMicro'))$('#fieldMicro').onclick=()=>fieldMicro();
  if(mode==='plan'){await fieldPlan(units,history,generation);return;}
  const kinds=Object.entries(FIELD_KINDS);
  $('#fieldBody').innerHTML=`<div class="row" style="margin:16px 0"><select class="auto" id="fieldKind"><option value="">Tüm çalışmalar</option>${kinds.map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select><select class="auto" id="fieldProduct"><option value="">Tüm ürünler</option>${fieldProducts().map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select><input type="search" id="fieldSearch" placeholder="Başlık, beceri, uzmanlık ara" style="flex:1;min-width:180px"></div><div id="fieldCards"></div>`;
@@ -140,7 +143,7 @@ async function fieldEditor(id=null){
  }catch(e){toast(e.message);}
 }
 
-function fieldReading(payload){return (payload.comparison?.length?`<div class="tablewrap"><table class="t"><thead><tr><th>Başlık</th><th>Ürün</th><th>Alternatif / rakip</th></tr></thead><tbody>${payload.comparison.map(r=>`<tr><td>${esc(r.topic)}</td><td>${esc(r.product)}</td><td>${esc(r.alternative)}</td></tr>`).join('')}</tbody></table></div>`:'')+(payload.visit?`<div class="grid2"><div><h3>Ana mesajlar</h3><ul>${payload.visit.messages.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div><div><h3>Olası hekim soruları</h3><ul>${payload.visit.questions.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div></div>`:'');}
+function fieldReading(payload){return (typeof microReading==='function'?microReading(payload):'')+(payload.comparison?.length?`<div class="tablewrap"><table class="t"><thead><tr><th>Başlık</th><th>Ürün</th><th>Alternatif / rakip</th></tr></thead><tbody>${payload.comparison.map(r=>`<tr><td>${esc(r.topic)}</td><td>${esc(r.product)}</td><td>${esc(r.alternative)}</td></tr>`).join('')}</tbody></table></div>`:'')+(payload.visit?`<div class="grid2"><div><h3>Ana mesajlar</h3><ul>${payload.visit.messages.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div><div><h3>Olası hekim soruları</h3><ul>${payload.visit.questions.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div></div>`:'');}
 
 function fieldRecommendations(units,history,examErrors,products){const weak=fieldWeaknesses(history);const priority=u=>weak.some(w=>w.product_id===u.product_id&&w.skill===u.skill)?0:examErrors.some(e=>e.area&&e.area===products.find(p=>p.id===u.product_id)?.area)?1:history.some(h=>h.unit_id===u.id&&h.version===u.version)?3:2;const order={comparison:0,visit:1,errors:2,objection:3,branch:4,update:5};return units.slice().sort((a,b)=>priority(a)-priority(b)||order[a.kind]-order[b.kind]);}
 

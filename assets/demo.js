@@ -254,6 +254,21 @@
         { id: "b2", prompt: "Hekim: \"Tamam, kartı bırakın. Lenfosit takibi ne sıklıkta?\"", choices: [{ label: "Ürün bilgisindeki öneriyi kartta işaretledim; ayrıntı için tıbbi bilgi birimimiz size dönebilir.", next: null }, { label: "Bence üç ayda bir yeterli.", next: null }] }
       ] }, sources: [] }
   ];
+  // Onaylanmış örnek mikro eğitim: sesli özet, 3 bilgi kartı ve 5 soru.
+  const microQuiz = [
+    ["Onkavia hangi sıklıkla uygulanır?", ["3 haftada bir", "Her gün", "Haftada bir", "Ayda bir"], "Kısa ürün bilgisine göre 3 haftada bir intravenöz infüzyon."],
+    ["İlk infüzyon ne kadar sürer?", ["90 dakika", "15 dakika", "4 saat", "30 dakika"], "İlk infüzyon 90 dakikadır; tolere edilirse sonrakiler 30 dakikaya iner."],
+    ["Tedavi süresince hangi izlem önerilir?", ["Düzenli kardiyak değerlendirme", "Göz muayenesi", "Kemik yoğunluğu ölçümü", "İzlem gerekmez"], "Uyarılar bölümüne göre kardiyak fonksiyon düzenli değerlendirilmelidir."],
+    ["İnfüzyon reaksiyonları en sık ne zaman görülür?", ["İlk uygulamada", "Tedavi bitiminde", "Altıncı dozda", "Hiç görülmez"], "Reaksiyonlar ilk uygulamada daha sıktır."],
+    ["Şüpheli bir advers etkiyi öğrendiğinizde ne yaparsınız?", ["Farmakovijilans birimine bildiririm", "Bir sonraki ziyarette sorarım", "Not almam", "Hastayı ararım"], "Şüpheli advers etkiler farmakovijilans birimine bildirilmelidir."]
+  ];
+  fieldUnits.push({ id: "f-micro", kind: "update", title: "Onkavia güncel ürün bilgisi: 3 dakikada", product_id: "p-onk", product: "Onkavia", specialty: "Genel", skill: "Tıbbi doğruluk", version: 1, status: "approved",
+    payload: { body: "Kısa ürün bilgisinin güncellenen uygulama ve güvenlilik bölümlerinin özeti.", start: "q1",
+      podcast: "Merhaba. Bu kısa özette Onkavia'nın güncellenen ürün bilgisine bakıyoruz. Onkavia, HER2 pozitif metastatik meme kanserinde kullanılan bir monoklonal antikor ve üç haftada bir damar yoluyla uygulanıyor. İlk infüzyon doksan dakika sürüyor; hasta iyi tolere ederse sonraki infüzyonlar otuz dakikaya iniyor. Hekimlerin en sık sorduğu konu güvenlilik. Ürün bilgisi, tedavi öncesinde ve tedavi boyunca kalp fonksiyonunun düzenli değerlendirilmesini öneriyor. İnfüzyonla ilişkili reaksiyonlar en çok ilk uygulamada görülüyor. Sahada bir yan etki duyarsanız, ne kadar küçük görünürse görünsün, uygulamadaki Yan etki bildir düğmesiyle tıbbi birime iletin. Şimdi beş kısa soruyla bilgimizi pekiştirelim.",
+      flashcards: [{ title: "3 haftada bir", text: "İntravenöz infüzyon; ilk doz 90, sonrakiler 30 dakika.", page: 1 }, { title: "Kardiyak izlem", text: "Tedavi öncesi ve süresince kalp fonksiyonu düzenli değerlendirilir.", page: 2 }, { title: "İlk infüzyona dikkat", text: "İnfüzyon reaksiyonları en sık ilk uygulamada görülür.", page: 2 }],
+      nodes: microQuiz.map(([q, options], i) => ({ id: "q" + (i + 1), prompt: q, choices: options.map(label => ({ label, next: i < 4 ? "q" + (i + 2) : null })) })) },
+    sources: [{ document_id: "d-onk", title: "Onkavia kısa ürün bilgisi", page: 1, approved_at: iso(-30) }, { document_id: "d-onk", title: "Onkavia kısa ürün bilgisi", page: 2, approved_at: iso(-30) }],
+    keys: Object.fromEntries(microQuiz.map(([, options, why], i) => ["q" + (i + 1), options.map((o, j) => ({ score: j ? 0 : 100, feedback: (j ? "Doğru cevap: " + options[0] + ". " : "Doğru. ") + why }))])) });
   const fieldHistory = [
     { unit_id: "f-obj", title: fieldUnits[0].title, product_id: "p-onk", skill: "İtiraz karşılama", version: 1, score: 55, completed_at: iso(-9) },
     { unit_id: "f-branch", title: fieldUnits[3].title, product_id: "p-nor", skill: "Kanıt kullanımı", version: 1, score: 85, completed_at: iso(-15) },
@@ -308,7 +323,7 @@
         { name: "Ayşe Demir", done: 2, assigned: 3, avg: 60, interactions: 11, interactions_30d: 4, last_interaction: date(-3) },
         { name: "Burcu Yalın", done: 3, assigned: 3, avg: 88, interactions: 22, interactions_30d: 7, last_interaction: date(-1) }] }
     ],
-    field_list: ({ p_manage } = {}) => p_manage ? fieldUnits.concat([{ ...fieldUnits[0], id: "f-draft", title: "Nörelin ilk doz itirazları (taslak)", product: "Nörelin", product_id: "p-nor", status: "draft", version: 1 }]) : fieldUnits,
+    field_list: ({ p_manage } = {}) => p_manage ? fieldUnits.slice() : fieldUnits.filter(u => u.status === "approved"),
     field_history: () => fieldHistory,
     field_notifications: ({ p_read } = {}) => { if (p_read) { const n = notices.find(x => x.id === p_read); if (n) n.read_at = new Date().toISOString(); return true; } return notices; },
     field_start: ({ p_id }) => ({ attempt_id: uid("att"), unit: fieldUnits.find(u => u.id === p_id) }),
@@ -326,8 +341,12 @@
       ["Sena Güneş", "Onkavia", "p-onk", "Dengeli anlatım", 5, 92, -1], ["Burcu Yalın", "Hemaris", "p-hem", "Tıbbi doğruluk", 3, 88, -3],
       ["Emre Çelik", "Onkavia", "p-onk", "İtiraz karşılama", 1, 45, -20]
     ].map(([name, product, product_id, skill, attempts, average, d]) => ({ name, product, product_id, skill, attempts, average, last_practice: iso(d) })),
-    field_review: () => true, field_save: () => true, field_edit: ({ p_id }) => fieldUnits.find(u => u.id === p_id) || fieldUnits[0],
-    field_source_options: () => DB.source_documents.flatMap(d => d.pages.map(p => ({ document_id: d.id, title: d.title, page: p.page, text: p.text }))),
+    field_review: ({ p_id, p_decision }) => { const u = fieldUnits.find(x => x.id === p_id); if (u) u.status = p_decision; return null; },
+    field_save: ({ p_id, p_product, p_kind, p_title, p_skill, p_specialty, p_payload, p_sources, p_keys }) => {
+      const id = p_id || uid("f"), u = { id, kind: p_kind, title: p_title, product_id: p_product, product: prodOf(p_product)?.name, specialty: p_specialty, skill: p_skill, version: 1, status: "draft", payload: p_payload, sources: p_sources, keys: p_keys };
+      const at = fieldUnits.findIndex(x => x.id === id); at >= 0 ? fieldUnits.splice(at, 1, u) : fieldUnits.unshift(u); return id;
+    }, field_edit: ({ p_id }) => fieldUnits.find(u => u.id === p_id) || fieldUnits[0],
+    field_source_options: ({ p_product } = {}) => DB.source_documents.filter(d => !p_product || d.product_id === p_product).flatMap(d => d.pages.map(p => ({ document_id: d.id, title: d.title, page: p.page, fingerprint: "demo", approved_at: d.created_at, text: p.text }))),
     duel_dashboard: () => ({
       region: duel.region, ready_categories: 5,
       people: [
@@ -391,13 +410,21 @@
   let doctorTurn = 0;
   function aiReply(body) {
     const sys = body.system || "", last = (body.messages || []).at(-1)?.content || "";
+    if (sys.includes("Yalnızca geçerli JSON") && last.startsWith("Mikro eğitim hazırla")) {
+      const docMsg = (body.messages || []).find(m => m.content.startsWith("BELGE: "))?.content || "", title = (docMsg.match(/^BELGE: (.+?) — bölüm/) || [])[1] || "Kaynak belge";
+      const p = products.find(x => title.includes(x.name)) || products[0];
+      return { text: JSON.stringify({ title: `${p.name}: yeni yayının öne çıkanları`, summary: `${title} belgesinden saha için hazırlanmış kısa özet (demo).`,
+        podcast: `Merhaba. Bu sesli özette ${p.name} ile ilgili güncel belgenin öne çıkan noktalarını dinleyeceksiniz. ${p.notes.split("\n").slice(1).join(" ")} Hekim sorularında yalnızca onaylı kaynaklara dayanın ve ayrıntılı klinik soruları tıbbi bilgi birimine yönlendirin. Şimdi beş kısa soruyla pekiştirelim.`,
+        flashcards: [{ title: "Uygulama", text: p.notes.split("\n")[1], page: 1 }, { title: "Sık sorulan konular", text: p.notes.split("\n")[2], page: 1 }, { title: "Güvenlilik", text: "Şüpheli advers etkiler farmakovijilans birimine bildirilir.", page: 2 }],
+        quiz: microQuiz.map(([q, options, why]) => ({ q, options, answer: 0, explanation: why, page: 1 })) }) };
+    }
     if (sys.includes("Yalnızca geçerli JSON")) {
       const topic = (last.match(/"([^"]+)" konusunda/) || [])[1] || "Pratik";
       const qs = exams[0].questions.slice(0, 3).concat(exams[1].questions.slice(0, 2));
       return { text: JSON.stringify({ title: topic + " — pratik sınavı", questions: qs.map(q => ({ q: q.q, options: q.options, answer: 0, explanation: "Demo sınavı: doğru cevap A şıkkıdır." })) }) };
     }
     if (sys.includes("hekim rolündesin")) return { text: doctorLines[doctorTurn++ % doctorLines.length] };
-    if (sys.includes("saha eğitim koçusun")) return { text: "İtiraz karşılama: 78/100 — Hekimin güvenlilik endişesini kabul edip onaylı kaynağa yönlendirdiniz (\"ilgili bölümü birlikte inceleyebiliriz\").\nİletişim yapısı: 72/100 — Açık sorular sordunuz; görüşmeyi bir sonraki adımla kapatmayı unutmayın.\n\nGüçlü yönler:\n• Kanıta dayalı ve dengeli dil\n• Bilmediğiniz ayrıntıda tıbbi bilgi birimine yönlendirme\n\nGeliştirilecekler:\n• Karşılaştırma sorularında kanıt düzeyini netleştirin\n• Görüşme sonunda somut bir takip önerin" };
+    if (sys.includes("saha eğitim koçusun")) return { text: "İtiraz karşılama: 78/100 — Hekimin güvenlilik endişesini kabul edip onaylı kaynağa yönlendirdiniz (\"ilgili bölümü birlikte inceleyebiliriz\").\nİletişim yapısı: 72/100 — Açık sorular sordunuz; görüşmeyi bir sonraki adımla kapatmayı unutmayın.\n\nGüçlü yönler:\n• Kanıta dayalı ve dengeli dil\n• Bilmediğiniz ayrıntıda tıbbi bilgi birimine yönlendirme\n\nGeliştirilecekler:\n• Karşılaştırma sorularında kanıt düzeyini netleştirin\n• Görüşme sonunda somut bir takip önerin\nZAYIF KONU: güvenlilik" };
     if (last.includes("iddialarını onaylı kaynaklara göre incele")) return { text: "Desteklenen iddialar: Kardiyak izlem önerisi (KÜB s.2).\nDoğrulanamayan iddialar: Görüşmede belirtilen izlem sıklığı onaylı kaynakta yer almıyor.", sources: [{ document_id: "d-onk", title: "Onkavia kısa ürün bilgisi", page: 2 }] };
     if (last.includes("örnek temsilci yanıtı")) return { text: "\"Endişenizi çok iyi anlıyorum. Onaylı ürün bilgisinde tedavi öncesi ve tedavi süresince kardiyak değerlendirme öneriliyor. İsterseniz ilgili bölümü birlikte inceleyelim; ayrıntılı veriler için tıbbi bilgi birimimizden size dönüş sağlayabilirim.\"", sources: [{ document_id: "d-onk", title: "Onkavia kısa ürün bilgisi", page: 2 }] };
     if (last.includes("Temsilci yanıtı:")) return { text: "Yanıtınız hekimin endişesini kabul ediyor; bu iyi bir başlangıç. Onaylı kaynağı (KÜB s.2) açıkça anmanız iddianızı güçlendirir. Kesin güvence veren ifadelerden kaçının.", sources: [{ document_id: "d-onk", title: "Onkavia kısa ürün bilgisi", page: 2 }] };

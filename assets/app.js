@@ -72,16 +72,21 @@ function vPortal() {
   const box = $("#todos");
   const visit = $("#logVisit"); if (visit) visit.onclick = e => { e.preventDefault(); interactionDialog(); };
   const watchesObjections = r === "urun_muduru" || ME.role === "admin";
-  Promise.allSettled([sb.rpc("learning_plan"), sb.rpc("field_notifications"), watchesObjections ? sb.rpc("objection_heatmap", { p_days: 30 }) : Promise.resolve({ data: null })]).then(([lp, fn, oh]) => {
+  Promise.allSettled([sb.rpc("learning_plan"), sb.rpc("field_notifications"), watchesObjections ? sb.rpc("objection_heatmap", { p_days: 30 }) : Promise.resolve({ data: null }), sb.rpc("field_list"), sb.rpc("field_history")]).then(([lp, fn, oh, fl, fh]) => {
     if (!box.isConnected) return;
     const extra = [];
     const plan = lp.status === "fulfilled" && !lp.value.error ? lp.value.data || [] : [];
     if (plan.length) extra.push(todoRow("#/ogrenme", icon.search, `${plan.length} yanlış soruyu tekrar edin`, "Tekrar soruları"));
     const notes = fn.status === "fulfilled" && !fn.value.error ? (fn.value.data || []).filter(n => !n.read_at) : [];
     if (notes.length) extra.push(todoRow("#/degisiklik", icon.folder, `${notes.length} ürün değişikliğini okuyun`, esc(notes[0].title), "amber"));
+    // Onaylanmış ve henüz çalışılmamış mikro eğitimler.
+    const ok = r => r.status === "fulfilled" && !r.value.error ? r.value.data || [] : [];
+    const done = ok(fh), micro = ok(fl).filter(u => u.kind === "update" && u.payload?.podcast && !done.some(h => h.unit_id === u.id && h.version === u.version)).slice(0, 2);
+    micro.forEach(u => extra.push(todoRow("#/sahacalisma", icon.book, "Yeni mikro eğitim: " + esc(u.title), "3 dakikalık sesli özet ve 5 soru").replace('class="todo"', `class="todo" data-micro-run="${esc(u.id)}"`)));
     const alerts = oh.status === "fulfilled" && oh.value.data ? oh.value.data.alerts || [] : [];
     alerts.slice(0, 2).forEach(a => extra.unshift(todoRow("#/itirazlar", icon.pulse, "İtiraz dalgası: " + esc(a.region), esc(objectionAlertText(a)), "amber")));
     box.insertAdjacentHTML("afterbegin", extra.join(""));
+    $$("[data-micro-run]", box).forEach(a => a.onclick = () => { window.fieldRunNext = a.dataset.microRun; });
     if (!box.children.length) box.innerHTML = `<p class="muted todo-empty">Bugün için başka iş yok. İyi çalışmalar!</p>`;
   });
 }
