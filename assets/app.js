@@ -38,43 +38,123 @@ function myStrip(st) {
   return strip([[st.total, "Toplam sınav"], [st.pending, "Bekleyen", "amber"], [st.done, "Tamamlanan"], ["%" + st.avg, "Ortalama puan", "brandc", st.avg]]);
 }
 
-/* ---------- Portal ---------- */
+/* ---------- Ana sekmeler: Bugün · Öğren · Pratik · Ben ---------- */
+const tile = (href, ic, t, d, attrs = "") => `<a class="tile" href="${href}" ${attrs}><span class="ic">${ic}</span><span><b>${t}</b><small>${d}</small></span></a>`;
+const todoRow = (href, ic, t, d, tone = "") => `<a class="todo" href="${href}"><span class="ic ${tone}">${ic}</span><span class="tx"><b>${t}</b><small>${d}</small></span><span class="arr" aria-hidden="true">›</span></a>`;
+const pendingExams = () => D.asg.filter(a => a.status !== "done").sort((x, y) => (x.due_date || "9999").localeCompare(y.due_date || "9999"));
+
 function vPortal() {
+  const r = ME.job_role, pending = pendingExams(), next = pending[0];
+  const hero = r === "avukat" && D.reviewCount
+    ? { t: `${D.reviewCount} içerik onayınızı bekliyor`, d: "Yayın öncesi sınav ve müfredatları onaylayın ya da gerekçeyle reddedin.", href: "#/inceleme", b: "İncelemeye başla" }
+    : next
+    ? { t: esc(next.exams.title), d: next.due_date ? `Son tarih ${fmtDate(next.due_date)}` : "Atanmış sınavınız", href: "#/sinav/" + next.id, b: "Sınava başla" }
+    : r === "pjp"
+    ? { t: "Bekleyen sınavınız yok", d: "Kısa bir hekim görüşmesiyle pratik yapın.", href: "#/roleplay", b: "Görüşme başlat" }
+    : { t: "Bekleyen sınavınız yok", d: "Bir eğitime göz atın ya da asistana soru sorun.", href: "#/ogren", b: "Öğrenmeye başla" };
+  const items = [];
+  if (pending.length > 1) items.push(todoRow("#/egitim", icon.book, `${pending.length - 1} sınav daha bekliyor`, "Sınavlarım"));
+  if (r === "urun_muduru") items.push(todoRow("#/ekip", icon.user, "Ekibinizin durumuna bakın", `${D.products.length} ürün · ekip raporu`));
+  const last = qolRead("lastPage");
+  if (last && /^#\/(sinav\/[a-zA-Z0-9-]+|mufredat|roleplay|sahacalisma|gelisim)$/.test(last)) items.push(todoRow(last, icon.pulse, "Kaldığınız yerden devam edin", "Son çalışmanız"));
+  if (r === "pjp") items.push(todoRow("#/roleplay", icon.user, "Hekim görüşmesi pratiği", "Yaklaşık 5 dakika"));
+  app.innerHTML = `
+  <div class="page-head"><div class="grow"><h1>Merhaba${ME.full_name ? ", " + esc(ME.full_name.split(" ")[0]) : ""}</h1></div></div>
+  <div class="hero"><div class="grow"><p class="small hero-k">Sıradaki adım</p><h2>${hero.t}</h2><p>${hero.d}</p></div><a class="btn" href="${hero.href}">${hero.b}</a></div>
+  <h2 class="section-t">Bugün yapılacaklar</h2>
+  <div class="todos" id="todos">${items.join("")}</div>
+  ${D.anns.length ? `<h2 class="section-t">Duyurular</h2><div class="panel">
+    ${D.anns.slice(0, 3).map(a => `<div class="ann ${a.pinned ? "pin" : ""}"><h3>${a.pinned ? "📌 " : ""}${esc(a.title)}</h3>
+      <p class="muted small">${fmtDate(a.created_at)}</p>${a.body ? `<p>${esc(a.body)}</p>` : ""}</div>`).join("")}</div>` : ""}`;
+  // Tekrar soruları ve ürün değişiklikleri sunucudan gelir; gelmezse liste olduğu gibi kalır.
+  const box = $("#todos");
+  Promise.allSettled([sb.rpc("learning_plan"), sb.rpc("field_notifications")]).then(([lp, fn]) => {
+    if (!box.isConnected) return;
+    const extra = [];
+    const plan = lp.status === "fulfilled" && !lp.value.error ? lp.value.data || [] : [];
+    if (plan.length) extra.push(todoRow("#/ogrenme", icon.search, `${plan.length} yanlış soruyu tekrar edin`, "Tekrar soruları"));
+    const notes = fn.status === "fulfilled" && !fn.value.error ? (fn.value.data || []).filter(n => !n.read_at) : [];
+    if (notes.length) extra.push(todoRow("#/degisiklik", icon.folder, `${notes.length} ürün değişikliğini okuyun`, esc(notes[0].title), "amber"));
+    box.insertAdjacentHTML("afterbegin", extra.join(""));
+    if (!box.children.length) box.innerHTML = `<p class="muted todo-empty">Bugün için başka iş yok. İyi çalışmalar!</p>`;
+  });
+}
+
+function vOgren() {
+  const f = sub.learnFilter || "Tümü";
+  app.innerHTML = `
+  <div class="page-head"><div class="grow"><h1>Öğren</h1><p class="muted">Eğitimler, ürün bilgileri ve belgeler tek yerde.</p></div></div>
+  <input id="learnSearch" class="searchbox" type="search" placeholder="Ürün, eğitim veya belge ara" aria-label="Ara">
+  <div class="seg chips" role="group" aria-label="Filtre">${["Tümü", "Eğitim", "Ürün", "Belge", "Not"].map(x => `<button data-lf="${x}" class="${x === f ? "on" : ""}">${x}</button>`).join("")}</div>
+  <a class="ask" href="#/kutuphane" id="askAi"><span class="ic">${icon.search}</span><span class="tx"><b>Asistana soru sorun</b><small>Ürünler ve onaylı belgeler hakkında</small></span><span class="arr" aria-hidden="true">›</span></a>
+  <div class="panel list-panel"><div class="list" id="learnResults"><p class="muted">Yükleniyor…</p></div></div>
+  <p class="small muted more-links">Tümünü gör: <a href="#/mufredat">Eğitimler</a> · <a href="#/kutuphane">Ürünler</a> · <a href="#/belgeler">Belgeler</a></p>`;
+  $("#askAi").onclick = () => { sub.libTab = "ai"; };
+  let docs = [];
+  const root = $("#learnResults"), input = $("#learnSearch");
+  const render = () => {
+    if (!root.isConnected) return;
+    const q = input.value.toLocaleLowerCase("tr"), cur = sub.learnFilter || "Tümü";
+    const rows = qolItems(docs).filter(x => x.type !== "Sınav" && x.type !== "Çalışma")
+      .filter(x => cur === "Tümü" || x.type === cur)
+      .filter(x => !q || (x.title + " " + x.body).toLocaleLowerCase("tr").includes(q)).slice(0, 40);
+    root.innerHTML = rows.map((x, i) => `<button class="item item-btn" data-open="${i}"><div class="grow"><h3>${esc(x.title)}</h3><p class="muted small">${esc(x.type)}</p></div><span class="arr" aria-hidden="true">›</span></button>`).join("")
+      || `<p class="muted">${q ? "Sonuç bulunamadı. Asistana sormayı deneyin." : "Henüz içerik yok."}</p>`;
+    $$("[data-open]", root).forEach(b => b.onclick = () => qolOpen(rows[+b.dataset.open]));
+  };
+  input.oninput = render;
+  $$("[data-lf]").forEach(b => b.onclick = () => { sub.learnFilter = b.dataset.lf; $$("[data-lf]").forEach(x => x.classList.toggle("on", x === b)); render(); });
+  render();
+  sb.from("source_documents").select("id,title,pages").eq("status", "approved").then(r => { docs = r.data || []; render(); });
+}
+
+function vPratik() {
+  const r = ME.job_role, pending = pendingExams().length;
+  const tiles = [
+    tile("#/egitim", icon.book, "Sınavlar", pending ? `${pending} bekleyen` : "Pratik sınavı oluşturun"),
+    r === "pjp" ? tile("#/roleplay", icon.user, "Hekim görüşmesi", "Sesli veya yazılı pratik") : "",
+    r === "pjp" ? tile("#/duello", icon.pulse, "Bilgi yarışması", "Bir meslektaşınızla") : "",
+    tile("#/yanlislar", icon.search, "Yanlışlarım", "Hatalı cevaplar ve doğruları"),
+    tile("#/ogrenme", icon.folder, "Tekrar soruları", "Eksik konularınıza göre"),
+    tile("#/sahacalisma", icon.box, "Saha senaryoları", "Adım adım vaka çalışmaları")
+  ].filter(Boolean).join("");
+  app.innerHTML = `
+  <div class="page-head"><div class="grow"><h1>Pratik</h1><p class="muted">Kendinizi deneyin, eksiklerinizi kapatın.</p></div></div>
+  <div class="tiles">${tiles}</div>`;
+}
+
+function vBen() {
   const st = myStats(), c = D.cls, r = ME.job_role;
   const recent = D.asg.filter(a => a.status === "done").sort((x, y) => (y.completed_at || "").localeCompare(x.completed_at || "")).slice(0, 3);
-  const next = D.asg.filter(a => a.status !== "done").sort((x, y) => (x.due_date || "9999").localeCompare(y.due_date || "9999"))[0];
-  const hero = r === "avukat" && D.reviewCount
-    ? { t: `${D.reviewCount} içerik incelemenizi bekliyor`, d: "Yayın öncesi sınav ve müfredatları onaylayın ya da gerekçeyle reddedin.", href: "#/inceleme", b: "İncelemeye başla" }
-    : next
-    ? { t: esc(next.exams.title), d: `Sıradaki sınavınız${next.due_date ? " · son tarih " + fmtDate(next.due_date) : ""}. ${st.pending > 1 ? `Toplam ${st.pending} sınav bekliyor.` : ""}`, href: "#/sinav/" + next.id, b: "Sınava başla" }
-    : { t: "Bekleyen sınavınız yok", d: "Bugün kısa bir tekrar yapın ya da çalışma masanızdan bir konu seçin.", href: "#/masam", b: "Çalışma masamı aç" };
-  const tile = (href, ic, t, d) => `<a class="tile" href="${href}"><span class="ic">${ic}</span><span><b>${t}</b><small>${d}</small></span></a>`;
-  const tiles = [
-    tile("#/egitim", icon.book, "Sınavlarım", `${st.pending} bekleyen`),
-    tile("#/kutuphane", icon.search, "Asistana sor", "Ürün bilgisi ve yapay zekâ"),
-    tile("#/mufredat", icon.folder, "Müfredat", `${D.curricula.length} eğitim`),
-    r === "pjp" ? tile("#/roleplay", icon.user, "Hekim simülasyonu", "Görüşme pratiği yapın")
-      : r === "urun_muduru" ? tile("#/ekip", icon.user, "Ekip raporu", `${D.products.length} ürün`)
-      : r === "avukat" ? tile("#/inceleme", icon.box, "Hukuk incelemesi", `${D.reviewCount} bekliyor`)
-      : tile("#/sahacalisma", icon.pulse, "Saha çalışmaları", "Senaryolarla çalışın"),
-    tile("#/yanlislar", icon.pulse, "Yanlışlarım", "Hatalarınızı tekrar edin"),
-    tile("#/masam", icon.box, "Çalışma masam", "Arama, notlar, favoriler")
+  const link = (href, t, extra = "") => `<a class="menu-row" href="${href}"><span>${t}</span>${extra}<span class="arr" aria-hidden="true">›</span></a>`;
+  const badge = n => n ? `<span class="badge-n">${n}</span>` : "";
+  const work = [
+    r === "avukat" ? link("#/inceleme", "Hukuk incelemesi", badge(D.reviewCount)) : "",
+    r === "avukat" ? link("#/duellosoru", "Yarışma soruları") : "",
+    r === "urun_muduru" ? link("#/ekip", "Ekip raporu") + link("#/beceri", "Beceri haritası") : "",
+    fieldManager() || fieldReviewer() ? link("#/atolye", "İçerik atölyesi") : ""
   ].join("");
   app.innerHTML = `
-  <div class="page-head"><div class="grow"><h1>Merhaba${ME.full_name ? ", " + esc(ME.full_name.split(" ")[0]) : ""}</h1>
-    <p class="muted">${roleLabel(r)} · Bugün ne yapmak istersiniz?</p></div></div>
-  <div class="hero"><div class="grow"><p class="small hero-k">Sıradaki adım</p><h2>${hero.t}</h2><p>${hero.d}</p></div><a class="btn" href="${hero.href}">${hero.b} →</a></div>
-  <div class="tiles">${tiles}</div>
-  ${D.anns.length ? `<div class="panel mt"><h2>Duyurular</h2>
-    ${D.anns.slice(0, 3).map(a => `<div class="ann ${a.pinned ? "pin" : ""}"><h3>${a.pinned ? "📌 " : ""}${esc(a.title)}</h3>
-      <p class="muted small">${fmtDate(a.created_at)}${a.target_role ? " · " + roleLabel(a.target_role) + " için" : ""}</p>${a.body ? `<p>${esc(a.body)}</p>` : ""}</div>`).join("")}</div>` : ""}
-  <div class="panel mt"><div class="row"><h2 class="grow">İlerlemem</h2><a class="btn ghost sm" href="#/egitim">Tüm sınavlar</a></div>
-    <div class="mini-stats"><div><b>${st.done}/${st.total}</b><span>Tamamlanan sınav</span></div><div><b>%${st.avg}</b><span>Ortalama puanım</span></div><div><b>%${c.avg ?? 0}</b><span>Ekip ortalaması</span></div></div>
+  <div class="page-head"><div class="grow"><h1>${esc(ME.full_name || ME.email)}</h1><p class="muted">${roleLabel(r)}${ME.role === "admin" ? " · Yönetici" : ""}</p></div></div>
+  <div class="panel"><h2>İlerlemem</h2>
+    <div class="mini-stats"><div><b>${st.done}/${st.total}</b><span>Tamamlanan sınav</span></div><div><b>%${st.avg}</b><span>Ortalamam</span></div><div><b>%${c.avg ?? 0}</b><span>Ekip ortalaması</span></div></div>
     ${recent.length ? `<div class="list" style="margin-top:12px">${recent.map(a => `
-      <div class="item"><div class="grow"><h3>${esc(a.exams.title)}</h3><p class="muted small">${fmtDate(a.completed_at)}${a.exams.is_practice ? " · Pratik" : ""}</p></div>
-      <span class="pill ${a.score >= 70 ? "ok" : "wait"}">%${a.score}</span></div>`).join("")}</div>`
-    : `<p class="muted" style="margin-top:10px">Henüz sonuç yok. İlk sınavınızı tamamladığınızda burada görünür.</p>`}
+      <div class="item"><div class="grow"><h3>${esc(a.exams.title)}</h3><p class="muted small">${fmtDate(a.completed_at)}</p></div>
+      <span class="pill ${a.score >= 70 ? "ok" : "wait"}">%${a.score}</span></div>`).join("")}</div>` : ""}
+  </div>
+  ${work ? `<h2 class="section-t">Görevlerim</h2><div class="menu">${work}</div>` : ""}
+  <h2 class="section-t">Hesabım</h2>
+  <div class="menu">
+    ${r === "pjp" ? link("#/paydaslar", "Hekimlerim", `<small>${D.hcps.length} kayıt</small>`) : ""}
+    ${link("#/masam", "Notlarım ve favorilerim")}
+    ${link("#/degisiklik", "Ürün değişiklikleri")}
+    ${link("#/profil", "Profil ve şifre")}
+    ${ME.role === "admin" ? link("admin.html", "Yönetim paneli") : ""}
+    <button class="menu-row" id="benTheme"><span>Tema değiştir</span><span class="arr" aria-hidden="true">›</span></button>
+    <button class="menu-row danger" id="benOut"><span>Çıkış yap</span></button>
   </div>`;
+  $("#benTheme").onclick = () => $("#themeBtn")?.click();
+  $("#benOut").onclick = () => $("#signOut")?.click();
 }
 
 /* ---------- Sınavlar ---------- */
@@ -276,7 +356,7 @@ function vMufredat() {
 function vPaydaslar() {
   const t = sub.pTab || "hekim";
   app.innerHTML = `
-  <div class="page-head"><div class="grow"><h1>Paydaşlar</h1><p class="muted">Hekimleriniz ve etkileşim geçmişi</p></div></div>
+  <div class="page-head"><div class="grow"><h1>Hekimlerim</h1><p class="muted">Görüştüğünüz hekimler ve ziyaret geçmişi.</p></div></div>
   <div class="seg">
     <button data-pt="hekim" class="${t === "hekim" ? "on" : ""}">Hekimler <span class="n">${D.hcps.length}</span></button>
     <button data-pt="etk" class="${t === "etk" ? "on" : ""}">Etkileşimler <span class="n">${D.interactions.length}</span></button>
@@ -490,46 +570,52 @@ function downloadCSV(name, rows) {
 }
 
 /* ---------- Yönlendirme ---------- */
-// Menü, az sayıda ana gruba ayrılır; seçili grubun sayfaları ikinci satırda listelenir.
-function navGroups() {
-  const r = ME.job_role;
-  const badge = D.reviewCount ? `<span class="badge-n">${D.reviewCount}</span>` : "";
-  const groups = [
-    ["home", "Ana sayfa", [["portal", "Ana sayfa"]]],
-    ["learn", "Öğren", [["masam", "Çalışma masam"], ["egitim", "Sınavlarım"], ["mufredat", "Müfredat"], ["kutuphane", "Kütüphane ve asistan"], ["ogrenme", "Öğrenme planım"], ["yanlislar", "Yanlışlarım"], ["belgeler", "Kaynak belgeleri"]]],
-    ["field", "Saha", [
-      ...(r === "pjp" ? [["roleplay", "Hekim simülasyonu"], ["paydaslar", "Paydaşlar"], ["duello", "Düellolar"]] : []),
-      ["sahacalisma", "Saha çalışmaları"], ["gelisim", "Gelişim rotam"], ["degisiklik", "Ürün değişiklikleri"]]]
-  ];
-  const work = [];
-  if (r === "avukat") work.push(["inceleme", "Hukuk incelemesi" + badge], ["duellosoru", "Düello soruları"]);
-  if (r === "urun_muduru") work.push(["ekip", "Ekip raporu"], ["beceri", "Beceri haritası"]);
-  if (fieldManager() || fieldReviewer()) work.push(["atolye", "İçerik atölyesi"]);
-  if (work.length) groups.push(["work", "Görevlerim" + (r === "avukat" ? badge : ""), work]);
-  return groups;
+// Dört ana sekme; diğer sayfalar bu sekmelerin içinden açılır ve geri bağlantısı sekmeye döner.
+const TABS = [
+  ["portal", "Bugün", '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>'],
+  ["ogren", "Öğren", icon.book],
+  ["pratik", "Pratik", '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4z"/></svg>'],
+  ["ben", "Ben", icon.user]
+];
+function pageTabs() {
+  const r = ME.job_role, m = {
+    portal: "portal", degisiklik: "portal",
+    ogren: "ogren", mufredat: "ogren", kutuphane: "ogren", belgeler: "ogren",
+    pratik: "pratik", egitim: "pratik", sinav: "pratik", yanlislar: "pratik", ogrenme: "pratik", sahacalisma: "pratik", gelisim: "pratik",
+    ben: "ben", profil: "ben", masam: "ben"
+  };
+  if (r === "pjp") Object.assign(m, { roleplay: "pratik", duello: "pratik", paydaslar: "ben" });
+  if (r === "avukat") Object.assign(m, { inceleme: "ben", duellosoru: "ben" });
+  if (r === "urun_muduru") Object.assign(m, { ekip: "ben", beceri: "ben" });
+  if (fieldManager() || fieldReviewer()) m.atolye = "ben";
+  return m;
 }
-function navItems() { return navGroups().flatMap(g => g[2]); }
 function route() {
   fieldGeneration++;
   if (window.stopRoleplay) window.stopRoleplay();
   const h = location.hash.replace(/^#\/?/, "") || "portal";
   const [p, arg] = h.split("/");
-  const allowed = navItems().map(x => x[0]).concat(["sinav", "profil"]);
-  const page = allowed.includes(p) ? p : "portal";
-  const tab = page === "sinav" ? "egitim" : page;
-  const groups = navGroups(), cur = groups.find(g => g[2].some(x => x[0] === tab));
-  $("#nav").innerHTML = groups.map(([id, l, items]) => `<a href="#/${items[0][0]}" class="${cur && cur[0] === id ? "active" : ""}">${l}</a>`).join("");
-  const subNav = $("#subnav");
-  if (subNav) {
-    const items = cur && cur[2].length > 1 ? cur[2] : [];
-    subNav.hidden = !items.length;
-    subNav.innerHTML = items.map(([k, l]) => `<a href="#/${k}" class="${k === tab ? "active" : ""}">${l}</a>`).join("");
-    const on = subNav.querySelector(".active"); if (on) subNav.scrollLeft = on.offsetLeft - 20;
+  const tabs = pageTabs();
+  const page = p in tabs ? p : "portal", tab = tabs[page];
+  const badge = ME.job_role === "avukat" && D.reviewCount ? `<span class="badge-n">${D.reviewCount}</span>` : "";
+  const links = TABS.map(([k, l, ic]) => `<a href="#/${k}" class="${k === tab ? "active" : ""}"${k === tab ? ' aria-current="page"' : ""}>${ic}<span>${l}</span>${k === "ben" ? badge : ""}</a>`).join("");
+  $("#nav").innerHTML = links;
+  const bar = $("#tabbar"); if (bar) bar.innerHTML = links;
+  const views = { masam: vTools, yanlislar: vMistakes, sahacalisma: vField, gelisim: () => vField("plan"), degisiklik: vFieldNotices, atolye: () => vField("manage"), beceri: vFieldHeatmap, duello: vDuello, duellosoru: vDuelQuestions, ogrenme: vOgrenme, belgeler: vBelgeler, portal: vPortal, ogren: vOgren, pratik: vPratik, ben: vBen, egitim: vEgitim, kutuphane: vKutuphane, mufredat: vMufredat, paydaslar: vPaydaslar, ekip: vEkip, inceleme: vInceleme, profil: vProfil, roleplay: vRoleplay, sinav: () => vSinav(arg) };
+  const hub = TABS.some(t => t[0] === page);
+  // Alt sayfalarda, ait olduğu sekmeye dönen tek bir geri bağlantısı (sınav sayfasının kendi bağlantısı var).
+  const back = $("#backLink");
+  if (back) {
+    const t = TABS.find(x => x[0] === tab);
+    back.hidden = hub || page === "sinav";
+    back.href = "#/" + t[0]; back.textContent = "← " + t[1];
   }
-  const views = { masam: vTools, yanlislar: vMistakes, sahacalisma: vField, gelisim: () => vField("plan"), degisiklik: vFieldNotices, atolye: () => vField("manage"), beceri: vFieldHeatmap, duello: vDuello, duellosoru: vDuelQuestions, ogrenme: vOgrenme, belgeler: vBelgeler, portal: vPortal, egitim: vEgitim, kutuphane: vKutuphane, mufredat: vMufredat, paydaslar: vPaydaslar, ekip: vEkip, inceleme: vInceleme, profil: vProfil, sinav: () => vSinav(arg) };
-  const rendered = page === "roleplay" ? vRoleplay() : views[page]();
-  Promise.resolve(rendered).then(()=>{if(location.hash.replace(/^#\/?/, "").split("/")[0] === p || !location.hash) qolPageTools(page);}).catch(e=>console.error(e));
-  if (!["portal","masam","yanlislar","profil"].includes(page)) qolWrite("lastPage", location.hash);
+  const rendered = views[page]();
+  Promise.resolve(rendered).then(() => {
+    if ((location.hash.replace(/^#\/?/, "").split("/")[0] || "portal") !== p && location.hash) return;
+    if (!hub) qolPageTools(page);
+  }).catch(e => console.error(e));
+  if (!hub && !["masam", "yanlislar", "profil"].includes(page)) qolWrite("lastPage", location.hash);
 }
 window.addEventListener("hashchange", () => { if (ME) { route(); window.scrollTo(0, 0); } });
 boot(async () => { await loadAll(); route(); });

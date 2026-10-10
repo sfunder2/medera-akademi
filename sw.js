@@ -1,5 +1,5 @@
 /* Uygulama kabuğu için önbellek. Veriler (Supabase) her zaman ağdan gelir. */
-const CACHE = "medera-v1";
+const CACHE = "medera-v2";
 const SHELL = ["./", "index.html", "admin.html", "config.js", "manifest.webmanifest",
   "assets/style.css", "assets/qol.css", "assets/shared.js", "assets/features.js", "assets/duels.js",
   "assets/roleplay.js", "assets/field-training.js", "assets/qol.js", "assets/app.js", "assets/admin.js",

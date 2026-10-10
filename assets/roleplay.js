@@ -3,13 +3,17 @@ let roleplayCleanup = null;
 window.stopRoleplay = () => { if (roleplayCleanup) roleplayCleanup(); roleplayCleanup = null; };
 function vRoleplay() {
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  app.innerHTML = `<div class="page-head"><div><h1>Hekim ile sesli role-play</h1><p class="muted">Sunum yapın, itirazları karşılayın ve geri bildirim alın.</p></div></div>
+  app.innerHTML = `<div class="page-head"><div class="grow"><h1>Hekim görüşmesi</h1><p class="muted">Sanal bir hekimle konuşun, itirazları karşılayın, sonunda geri bildirim alın.</p></div></div>
   <div class="panel">
+    <div class="field"><label for="rpPersona">Kiminle görüşeceksiniz?</label><select id="rpPersona"><option>Kanıt isteyen, kuşkucu hekim</option><option>Rakip ürünü tercih eden hekim</option><option>Zamanı kısıtlı hekim</option></select></div>
+    <div class="ai-check notice" hidden><p id="rpHealth" role="status"></p><button class="btn ghost sm" id="rpHealthRetry">Tekrar dene</button></div>
+    <div class="row"><button class="btn" id="rpStart">Görüşmeyi başlat</button><button class="btn ghost" id="rpResume" hidden>Kaldığım yerden devam et</button><button class="btn ghost" id="rpDiscard" hidden>Kaydı sil</button></div>
+    <details class="settings"><summary>Ayarları değiştir</summary>
     <div class="field"><label for="rpProduct">Ürün</label><select id="rpProduct"><option value="__general__">Genel iletişim çalışması — ürün gerektirmez</option>${D.products.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select></div>
     ${!D.products.length?`<p class="notice">Hesabınıza henüz ürün atanmamış. Genel iletişim çalışmasıyla başlayabilirsiniz.${ME.role==='admin'?' Ürün eğitimi için <a href="admin.html#/kullanicilar">Kullanıcılar bölümünden ürün atayın</a>.':' Ürün eğitimi için yöneticinizden ürün ataması isteyin.'}</p>`:''}
-    <div class="field"><label for="rpPersona">Hekim karakteri</label><select id="rpPersona"><option>Kanıt isteyen, kuşkucu hekim</option><option>Rakip ürünü tercih eden hekim</option><option>Zamanı kısıtlı hekim</option></select></div>
-    <p class="small muted">Bu bir eğitim simülasyonudur. Gerçek hekim veya hasta bilgisi yazmayın. Mikrofonun yazıya çevirme hizmeti tarayıcı sağlayıcısı tarafından işletilebilir. Ham ses uygulamamızda saklanmaz; gönderdiğiniz metin AI hizmetine iletilir.</p>
-    <p id="rpHealth" role="status"></p><button class="btn ghost" id="rpHealthRetry">Bağlantıyı kontrol et</button><div class="field"><label for="rpLevel">Zorluk</label><select id="rpLevel"><option>Başlangıç</option><option>Orta</option><option>Zor</option></select></div><div class="field"><label for="rpTurns">Görüşme uzunluğu</label><select id="rpTurns"><option value="3">Kısa ziyaret — 3 yanıt</option><option value="6">Ayrıntılı görüşme — 6 yanıt</option><option value="9">Uzun görüşme — 9 yanıt</option></select></div><button class="btn ghost" id="rpResume" hidden>Kaldığım yerden devam et</button><button class="btn ghost" id="rpDiscard" hidden>Kaydı sil</button><button class="btn" id="rpStart">Görüşmeyi başlat</button>
+    <div class="field"><label for="rpLevel">Zorluk</label><select id="rpLevel"><option>Başlangıç</option><option>Orta</option><option>Zor</option></select></div><div class="field"><label for="rpTurns">Görüşme uzunluğu</label><select id="rpTurns"><option value="3">Kısa ziyaret — 3 yanıt</option><option value="6">Ayrıntılı görüşme — 6 yanıt</option><option value="9">Uzun görüşme — 9 yanıt</option></select></div>
+    </details>
+    <p class="small muted">Eğitim simülasyonudur; gerçek hekim veya hasta bilgisi yazmayın. Ses kaydı saklanmaz, yalnızca gönderdiğiniz metin işlenir.</p>
   </div>
   <div class="panel" id="rpSession" hidden>
     <p id="rpStatus" role="status" aria-live="polite"></p>
@@ -17,13 +21,13 @@ function vRoleplay() {
     <div class="field"><label for="rpAnswer">Yanıtınız (göndermeden önce düzeltebilirsiniz)</label><textarea id="rpAnswer" maxlength="4000" rows="4"></textarea></div>
     <div class="row"><button class="btn ghost" id="rpMic">${Recognition?'Mikrofonu aç':'Ses tanıma desteklenmiyor'}</button><button class="btn" id="rpSend">Yanıtı gönder</button><button class="btn ghost" id="rpInterrupt">Hekimin sözünü kes</button><button class="btn ghost" id="rpFinish">Bitir ve değerlendir</button></div>
     <div class="row" style="margin-top:12px"><button class="btn ghost" id="rpHint">İpucu</button><button class="btn ghost" id="rpPractice">Bu itirazı yeniden çalış</button><button class="btn ghost" id="rpExample">Örnek yaklaşım</button></div><p id="rpHelp" role="status" style="white-space:pre-wrap"></p><label style="display:block;margin-top:12px"><input id="rpVoice" type="checkbox" checked> Hekimin yanıtını sesli oku</label>
-    <p class="small muted">Ses tanıma desteklenmezse yazılı devam edebilirsiniz. Ses tonu puanı bu sürümde ölçülmez. Görüşme, taslak ve rapor bu cihazda hesabınıza özel kaydedilir. Ortak cihazda Çalışma masam bölümünden kayıtları temizleyin.</p>
+    <p class="small muted">Ses tanıma desteklenmezse yazılı devam edebilirsiniz. Ses tonu puanı bu sürümde ölçülmez. Görüşme, taslak ve rapor bu cihazda hesabınıza özel kaydedilir. Ortak cihazda Ben → Notlarım ve favorilerim bölümünden kayıtları temizleyin.</p>
   </div><div class="panel" id="rpReport" hidden></div>`;
   let alive=true, busy=false, finished=false, started=false, recognition=null, listening=false, messages=[], product=null, persona='', reportText='', level='Başlangıç', maxTurns=3, retryComparison='';
   const hasStore=typeof qolRead==='function';
   const save=()=>{if(hasStore&&alive)qolWrite('roleplay',{messages,product,persona,started,finished,reportText,level,maxTurns,draft:$('#rpAnswer').value,updated:Date.now()});};
   const saved=hasStore?qolRead('roleplay'):null;
-  const health=$('#rpHealth');if(typeof qolStatus==='function'){qolStatus(health);$('#rpHealthRetry').onclick=()=>qolStatus(health);}
+  const health=$('#rpHealth');if(typeof qolAiNotice==='function'){qolAiNotice(health);$('#rpHealthRetry').onclick=()=>qolAiNotice(health);}
   $('#rpAnswer').oninput=save;
   $('#rpResume').hidden=$('#rpDiscard').hidden=!saved;
   $('#rpDiscard').onclick=()=>{if(hasStore)qolDelete('roleplay');$('#rpResume').hidden=$('#rpDiscard').hidden=true;};

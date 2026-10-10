@@ -13,7 +13,7 @@ async function vField(mode='library'){
  try{
  const [units,history]=await Promise.all([fieldRPC('field_list',{p_manage:mode==='manage'}),fieldRPC('field_history')]);
  if(generation!==fieldGeneration)return;
- const title=mode==='manage'?'İçerik atölyesi':mode==='plan'?'Kişisel gelişim rotam':'Saha çalışma merkezi';
+ const title=mode==='manage'?'İçerik atölyesi':mode==='plan'?'Kişisel gelişim rotam':'Saha senaryoları';
  app.innerHTML=`<div class="page-head"><div class="grow"><h1>${title}</h1><p class="muted">Onaylı kaynaklarla kısa alıştırmalar, hazırlık kartları ve gelişim takibi.</p></div>${mode==='manage'&&fieldManager()?'<button class="btn" id="fieldNew">İçerik hazırla</button>':''}</div>
  <div class="seg"><button data-field="library">Çalışmalar</button><button data-field="plan">Gelişim rotam</button><button data-field="notices">Ürün değişiklikleri</button>${fieldManager()||fieldReviewer()?'<button data-field="manage">İçerik atölyesi</button>':''}${fieldManager()?'<button data-field="heatmap">Beceri haritası</button>':''}</div><div id="fieldBody"></div>`;
  $$('[data-field]').forEach(b=>{b.classList.toggle('on',b.dataset.field===mode);b.onclick=()=>b.dataset.field==='notices'?vFieldNotices():b.dataset.field==='heatmap'?vFieldHeatmap():vField(b.dataset.field);});
