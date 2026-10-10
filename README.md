@@ -191,6 +191,11 @@ Uygulama dört sekmeden oluşur; telefonda alt menüde, bilgisayarda üstte gör
 | **Pratik** | Sınavlar, hekim görüşmesi, bilgi yarışması (Düello), yanlışlarım, tekrar soruları, saha senaryoları |
 | **Ben** | İlerleme, hekimlerim, rol görevleri (hukuk incelemesi, ekip raporu, içerik atölyesi), notlar ve favoriler, profil, tema, çıkış |
 
+### Demo
+
+`demo.html` giriş gerektirmeyen bir tanıtım sürümüdür: https://sfunder2.github.io/medera-akademi/demo.html
+Kurgusal ürün, hekim, sınav ve eğitim verileriyle tarayıcıda çalışır; veritabanına bağlanmaz ve hiçbir şey kaydetmez. Yapay zekâ yanıtları hazır örnek metinlerdir. Üstteki şeritten PJP, ürün müdürü ve avukat rolleri arasında geçilebilir; doğrudan bir role bağlantı vermek için `demo.html?rol=urun_muduru` veya `demo.html?rol=avukat` kullanın.
+
 ---
 
 ## Mobil uygulama

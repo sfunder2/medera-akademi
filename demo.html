@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Medera Akademi — Demo</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+<meta name="theme-color" content="#16252E">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/qol.css">
+</head>
+<body class="app-user">
+<div class="demo-bar" id="demoBar"></div>
+<header class="top">
+  <div class="wrap">
+    <div class="top-row">
+      <a class="brand" href="#/portal">
+        <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><rect x="1" y="1" width="26" height="26" rx="8" fill="#5FD0C4"/><path d="M8 19V9l6 6 6-6v10" stroke="#16252E" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Medera Akademi
+      </a>
+      <nav class="tabs" id="nav" aria-label="Ana menü"></nav>
+      <div class="top-actions">
+        <a class="icon-btn" id="adminLink" href="admin.html" hidden>Yönetim paneli</a>
+        <!-- Tema, profil ve çıkış "Ben" sekmesinden kullanılır; bu düğmeler yalnızca işlevleri taşır. -->
+        <button class="icon-btn" id="themeBtn" aria-label="Tema değiştir" hidden></button>
+        <a class="icon-btn" id="userBtn" href="#/ben" hidden><span id="userName"></span></a>
+        <button class="icon-btn" id="signOut" hidden>Çıkış</button>
+      </div>
+    </div>
+  </div>
+</header>
+<main><div class="wrap"><a class="back" id="backLink" href="#/portal" hidden></a><div id="app"></div></div></main>
+<nav class="tabbar" id="tabbar" aria-label="Ana menü"></nav>
+<footer><div class="wrap"><span>Medera Akademi — saha ekipleri için eğitim, sınav ve bilgi merkezi</span><span>v3.0</span></div></footer>
+
+<script src="assets/demo.js"></script>
+<script src="config.js"></script>
+<script src="assets/shared.js"></script>
+<script src="assets/features.js"></script>
+<script src="assets/duels.js"></script>
+<script src="assets/roleplay.js"></script>
+<script src="assets/field-training.js"></script>
+<script src="assets/qol.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
+
+
+
