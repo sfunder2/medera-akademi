@@ -27,14 +27,19 @@ function bindObjectionFields(d) {
     $("#objCompetitor", d).hidden = $('[data-tag="rakip"]', d).getAttribute("aria-pressed") !== "true";
   });
 }
+function objectionRows(d, { hcp, productId }) {
+  const tags = $$('.tag-chip[aria-pressed="true"]', d).map(b => b.dataset.tag);
+  if (!tags.length) return [];
+  const region = regionOf(hcp?.city);
+  if (!region) { toast("İtirazlar kaydedilmedi: hekimin şehri bilinmiyor."); return []; }
+  const competitor = tags.includes("rakip") ? $("#objCompetitor", d).value.trim() || null : null;
+  return tags.map(tag => ({ user_id: ME.id, product_id: productId || null, tag, competitor: tag === "rakip" ? competitor : null, region }));
+}
 // Etiketler ayrı tabloya yazılır; tablo yoksa ziyaret kaydı yine de kalır.
 async function saveObjections(d, { interactionId, hcp, productId }) {
-  const tags = $$('.tag-chip[aria-pressed="true"]', d).map(b => b.dataset.tag);
-  if (!tags.length) return true;
-  const region = regionOf(hcp?.city);
-  if (!region) { toast("İtirazlar kaydedilmedi: hekimin şehri bilinmiyor."); return false; }
-  const competitor = tags.includes("rakip") ? $("#objCompetitor", d).value.trim() || null : null;
-  const r = await sb.from("field_objections").insert(tags.map(tag => ({ user_id: ME.id, interaction_id: interactionId, product_id: productId || null, tag, competitor: tag === "rakip" ? competitor : null, region })));
+  const rows = objectionRows(d, { hcp, productId });
+  if (!rows.length) return true;
+  const r = await sb.from("field_objections").insert(rows.map(x => ({ ...x, interaction_id: interactionId })));
   if (r.error) { console.error(r.error); toast("Ziyaret kaydedildi ama itiraz etiketleri kaydedilemedi."); return false; }
   return true;
 }
@@ -76,12 +81,23 @@ function pvDialog() {
     if (!productId && productName.length < 2) { msg.textContent = "İlacın adını yazın."; $("#pvProductName", d).focus(); return; }
     const b = $("#pvSend", d); busyBtn(b, true, "Gönderiliyor");
     const aware = $("#pvAware", d).value ? new Date($("#pvAware", d).value) : new Date();
-    const r = await sb.from("pv_reports").insert({
+    const row = {
       reporter_id: ME.id, product_id: productId || null, product_name: productId ? null : productName, event,
       serious: $("[data-serious][aria-pressed=true]", d).dataset.serious, source: $("#pvSource", d).value,
       hcp_id: $("#pvHcp", d)?.value || null, patient_age: $("#pvAge", d).value, patient_sex: $("#pvSex", d).value,
       aware_at: (aware > new Date() ? new Date() : aware).toISOString()
-    }).select("report_no").single();
+    };
+    const r = await sb.from("pv_reports").insert(row).select("report_no").single();
+    if (window.offline && offline.isNetworkError(r)) {
+      // Bağlantı yok: bildirim cihazda bekler ve bağlantı gelince kendiliğinden gönderilir.
+      offline.enqueue({ kind: "pv", row });
+      if (typeof qolDelete === "function") qolDelete("pvDraft");
+      $(".dialog", d).innerHTML = `<h2>Bildirim cihazda bekliyor</h2><p style="margin:10px 0">İnternet bağlantısı yok. Bildiriminiz kaydedildi ve bağlantı gelir gelmez tıbbi birime otomatik gönderilecek; takip numarası o zaman oluşur.</p>
+        ${row.serious === "evet" ? `<p class="notice">Ciddi bir durum bildirdiniz. Bağlantınız uzun süre gelmeyecekse tıbbi birimi telefonla arayın.</p>` : ""}
+        <div class="row end"><button class="btn" id="pvDone">Tamam</button></div>`;
+      $("#pvDone", d).onclick = () => d.remove();
+      return;
+    }
     if (r.error) { busyBtn(b, false, "Tıbbi birime gönder"); msg.textContent = "Gönderilemedi: " + r.error.message + ". Bildirimi tıbbi birime telefonla iletin."; return; }
     if (typeof qolDelete === "function") qolDelete("pvDraft");
     $(".dialog", d).innerHTML = `<h2>Bildirim iletildi</h2><p style="margin:10px 0">Takip numarası: <b>${esc(r.data.report_no)}</b></p>
@@ -93,10 +109,11 @@ function pvDialog() {
 async function vYanEtkilerim() {
   app.innerHTML = `<div class="center"><span class="spin"></span></div>`;
   const r = await sb.from("pv_reports").select("*, products(name)").eq("reporter_id", ME.id).order("created_at", { ascending: false });
-  const rows = r.data || [];
+  const rows = r.data || [], waiting = window.offline ? offline.pending("pv") : [];
   app.innerHTML = `<div class="page-head"><div class="grow"><h1>Yan etki bildirimlerim</h1><p class="muted">Tıbbi birime ilettiğiniz bildirimler ve durumları.</p></div><button class="btn" id="pvNew">Yan etki bildir</button></div>
-    ${r.error ? `<div class="panel"><p class="muted">Bildirimler yüklenemedi. Veritabanı güncellemesi (field_signals_v7.sql) yapılmamış olabilir.</p></div>`
-    : rows.length ? `<div class="panel"><div class="list">${rows.map(x => `<div class="item"><div class="grow"><h3>${esc(x.report_no)} · ${esc(x.products?.name || x.product_name || "")}</h3>
+    ${waiting.length ? `<div class="panel"><div class="list">${waiting.map(j => `<div class="item"><div class="grow"><h3>Gönderilmeyi bekliyor</h3><p class="muted small">${new Date(j.at).toLocaleString("tr-TR")} · ${PV_SERIOUS[j.row.serious]}</p><p style="font-size:14px;margin-top:4px">${esc(j.row.event)}</p></div><span class="pill wait">Cihazda</span></div>`).join("")}</div></div>` : ""}
+    ${r.error && !waiting.length ? `<div class="panel"><p class="muted">Bildirimler yüklenemedi. Veritabanı güncellemesi (field_signals_v7.sql) yapılmamış olabilir.</p></div>`
+    : r.error ? "" : rows.length ? `<div class="panel"><div class="list">${rows.map(x => `<div class="item"><div class="grow"><h3>${esc(x.report_no)} · ${esc(x.products?.name || x.product_name || "")}</h3>
       <p class="muted small">${fmtDate(x.created_at)} · ${PV_SERIOUS[x.serious]}</p><p style="font-size:14px;margin-top:4px">${esc(x.event)}</p>
       ${x.unit_note ? `<p class="notice" style="margin:8px 0 0">Tıbbi birim: ${esc(x.unit_note)}</p>` : ""}</div>
       <span class="pill ${PV_STATUS[x.status][1]}">${PV_STATUS[x.status][0]}</span></div>`).join("")}</div></div>`

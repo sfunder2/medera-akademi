@@ -270,3 +270,10 @@ details.settings[open] summary{margin-bottom:10px}
 .alert-card b{color:var(--amber);text-transform:uppercase;letter-spacing:.06em;font-size:12px}
 table.heat th[scope="row"]{white-space:nowrap;font-weight:700}
 table.heat td{text-align:center;font-weight:800;font-variant-numeric:tabular-nums;background:color-mix(in srgb,var(--amber) var(--heat,0%),var(--surface));min-width:64px}
+
+/* Çevrimdışı durum şeridi */
+.net-bar{background:var(--surface2);color:var(--ink);border-bottom:1px solid var(--line);font-size:13px;text-align:center;padding:8px 16px}
+.net-bar.off{background:var(--amber-soft)}
+.net-bar[hidden]{display:none}
+.net-bar b{color:var(--amber)}
+.net-bar .linkbtn{background:none;border:0;padding:0;color:var(--red);font-weight:700;text-decoration:underline;font-size:13px}

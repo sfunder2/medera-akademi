@@ -41,7 +41,8 @@ function myStrip(st) {
 /* ---------- Ana sekmeler: Bugün · Öğren · Pratik · Ben ---------- */
 const tile = (href, ic, t, d, attrs = "") => `<a class="tile" href="${href}" ${attrs}><span class="ic">${ic}</span><span><b>${t}</b><small>${d}</small></span></a>`;
 const todoRow = (href, ic, t, d, tone = "") => `<a class="todo" href="${href}"><span class="ic ${tone}">${ic}</span><span class="tx"><b>${t}</b><small>${d}</small></span><span class="arr" aria-hidden="true">›</span></a>`;
-const pendingExams = () => D.asg.filter(a => a.status !== "done").sort((x, y) => (x.due_date || "9999").localeCompare(y.due_date || "9999"));
+const queuedExam = id => !!window.offline && offline.pending("submit_exam").some(j => j.args.p_assignment === id);
+const pendingExams = () => D.asg.filter(a => a.status !== "done" && !queuedExam(a.id)).sort((x, y) => (x.due_date || "9999").localeCompare(y.due_date || "9999"));
 
 function vPortal() {
   const r = ME.job_role, pending = pendingExams(), next = pending[0];
@@ -253,8 +254,10 @@ async function vSinav(id) {
   </div>
   <div class="row end" style="margin-top:16px">
     ${done ? (ex.is_practice ? `<button class="btn ghost" id="retry">Yeniden çöz</button>` : "")
+      : queuedExam(id) ? `<p class="notice" style="margin:0">Cevaplarınız cihazda kayıtlı. Bağlantı gelince otomatik gönderilecek ve puanınız görünecek.</p>`
       : `<span class="muted small">${ans.filter(x => x !== undefined && x !== null).length}/${ex.questions.length} yanıtlandı</span><button class="btn" id="finish">Sınavı gönder</button>`}
   </div>`;
+  if (!done && queuedExam(id)) $$(".opt").forEach(b => b.disabled = true);
   $$(".opt:not([disabled])").forEach(b => b.onclick = () => { ans[+b.dataset.q] = +b.dataset.o; qolWrite("exam:"+id,ans); vSinav(id); });
   const fin = $("#finish");
   if (fin) fin.onclick = async () => {
@@ -262,7 +265,9 @@ async function vSinav(id) {
     if (answered < ex.questions.length && !confirm("Yanıtlanmamış sorular var. Yine de gönderilsin mi?")) return;
     if (!ex.is_practice && !confirm("Gönderdikten sonra cevaplarınızı değiştiremezsiniz. Gönderilsin mi?")) return;
     busyBtn(fin, true, "Gönderiliyor");
-    const r = await sb.rpc("submit_exam", { p_assignment: id, p_answers: ex.questions.map((_, i) => ans[i] ?? null) });
+    const args = { p_assignment: id, p_answers: ex.questions.map((_, i) => ans[i] ?? null) };
+    const r = await sb.rpc("submit_exam", args);
+    if (window.offline && offline.isNetworkError(r)) { offline.enqueue({ kind: "submit_exam", args }); toast("Bağlantı yok. Cevaplarınız bağlantı gelince gönderilecek."); vSinav(id); return; }
     if (r.error) { busyBtn(fin, false, "Sınavı gönder"); toast(r.error.message); return; }
     qolDelete("exam:"+id); toast(`Sınav gönderildi: %${r.data}`); await loadAll(); window.scrollTo(0, 0); vSinav(id);
   };
@@ -439,7 +444,13 @@ function interactionDialog(hcpId) {
   $("#ix", d).onclick = () => d.remove();
   $("#isv", d).onclick = async () => {
     const hcp = D.hcps.find(h => h.id === $("#ih", d).value), productId = $("#ip", d).value || null;
-    const saved = check(await sb.from("interactions").insert({ owner_id: ME.id, hcp_id: $("#ih", d).value, type: $("#it", d).value, product_id: $("#ip", d).value || null, date: $("#idt", d).value || null, notes: $("#inn", d).value.trim() }).select().single());
+    const row = { owner_id: ME.id, hcp_id: $("#ih", d).value, type: $("#it", d).value, product_id: $("#ip", d).value || null, date: $("#idt", d).value || null, notes: $("#inn", d).value.trim() };
+    const res = await sb.from("interactions").insert(row).select().single();
+    if (window.offline && offline.isNetworkError(res)) {
+      offline.enqueue({ kind: "visit", interaction: row, objections: objectionRows(d, { hcp, productId }) });
+      d.remove(); toast("Bağlantı yok. Ziyaret cihaza kaydedildi, bağlantı gelince gönderilecek."); return;
+    }
+    const saved = check(res);
     await saveObjections(d, { interactionId: saved?.id, hcp, productId });
     d.remove(); toast("Ziyaret kaydedildi"); await loadAll(); if (location.hash.startsWith("#/paydaslar")) vPaydaslar(); else route();
   };
@@ -633,7 +644,7 @@ function route() {
   if (!hub && !["masam", "yanlislar", "profil"].includes(page)) qolWrite("lastPage", location.hash);
 }
 window.addEventListener("hashchange", () => { if (ME) { route(); window.scrollTo(0, 0); } });
-boot(async () => { await loadAll(); route(); });
+boot(async () => { await loadAll(); route(); window.offline?.start(); });
 
 
 

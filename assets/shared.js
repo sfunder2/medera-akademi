@@ -50,7 +50,12 @@ function busyBtn(btn, on, label) {
 }
 /* Supabase sonuçlarındaki hatayı göster ve fırlat */
 function check(res, msg) {
-  if (res && res.error) { console.error(res.error); toast((msg ? msg + ": " : "") + res.error.message); throw res.error; }
+  if (res && res.error) {
+    console.error(res.error);
+    const net = res.status === 0 || /Failed to fetch|NetworkError|Load failed/i.test(res.error.message || "");
+    toast(net ? "İnternet bağlantısı yok. Bu işlem için bağlandığınızda tekrar deneyin." : (msg ? msg + ": " : "") + res.error.message);
+    throw res.error;
+  }
   return res ? res.data : null;
 }
 
@@ -169,7 +174,7 @@ async function boot(render, { adminOnly = false } = {}) {
     return;
   }
   ME = profile;
-  const so = $("#signOut"); if (so) { so.hidden = false; so.onclick = async () => { await sb.auth.signOut(); location.href = location.pathname; }; }
+  const so = $("#signOut"); if (so) { so.hidden = false; so.onclick = async () => { await window.offline?.clear(); await sb.auth.signOut(); location.href = location.pathname; }; }
   const un = $("#userName"); if (un) un.textContent = ME.full_name || ME.email;
   const ub = $("#userBtn"); if (ub) ub.hidden = false;
   if (ME.status && ME.status !== "active") { showStatus(el, ME.status); return; }
