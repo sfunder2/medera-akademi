@@ -191,6 +191,16 @@ Uygulama dört sekmeden oluşur; telefonda alt menüde, bilgisayarda üstte gör
 | **Pratik** | Sınavlar, hekim görüşmesi, bilgi yarışması (Düello), yanlışlarım, tekrar soruları, saha senaryoları |
 | **Ben** | İlerleme, hekimlerim, rol görevleri (hukuk incelemesi, ekip raporu, içerik atölyesi), notlar ve favoriler, profil, tema, çıkış |
 
+### Saha itirazları ve yan etki bildirimi
+
+Mevcut veritabanına `supabase/field_signals_v7.sql` dosyasını SQL Editor'de bir kez çalıştırın (tekrar çalıştırılabilir).
+
+- **İtiraz etiketleri:** Temsilci ziyaret kaydederken (Bugün → Ziyaret kaydet veya Hekimlerim) karşılaştığı itirazları tek dokunuşla etiketler: #YanEtki, #Fiyat, #Etkinlik, #RakipÜrün (rakip ürün adıyla), #Uygulama, #KanıtYetersiz, #Erişim. Bölge, hekimin şehrinden otomatik bulunur.
+- **Isı haritası:** Ürün müdürleri (yalnızca kendi ürünleri) ve yöneticiler Ben → Saha itirazları sayfasında bölge × itiraz haritasını ve en çok anılan rakip ürünleri görür. Hekim adı gösterilmez; yalnızca sayılar döner.
+- **İtiraz dalgası uyarısı:** Bir bölgede bir itiraz türü son 7 günde en az 5 kez kaydedildiyse ve önceki 4 haftanın haftalık ortalamasının en az 2 katıysa, ürün müdürünün ve yöneticinin Bugün listesinde uyarı çıkar. "Mikro eğitim hazırla" düğmesi İçerik atölyesinde hazır başlıklı bir itiraz kartı taslağı açar; taslak her zamanki gibi hukuk onayından geçer.
+- **Yan etki bildir:** Üst çubuktaki düğme her sayfada görünür. Temsilci ne olduğunu, ilacı ve ciddiyeti girer; hasta için yalnızca yaş grubu ve cinsiyet istenir. Bildirim bir takip numarası alır, yalnızca bildiren kişi ve yöneticiler görebilir. Tıbbi birim yönetim panelindeki **Yan etki bildirimleri** sayfasından bildirimi incelemeye alır, not yazar ve kapatır; temsilci durumu Ben → Yan etki bildirimlerim bölümünde izler.
+- **E-posta ile anında haber almak için (önerilir):** Supabase panelinde **Database → Webhooks** bölümünden `pv_reports` tablosundaki `INSERT` olayları için tıbbi birimin kullandığı e-posta veya bildirim servisine bir webhook tanımlayın. Uygulama bu ayar olmadan da çalışır; bildirimler yönetim panelinde bekler.
+
 ### Demo
 
 `demo.html` giriş gerektirmeyen bir tanıtım sürümüdür: https://sfunder2.github.io/medera-akademi/demo.html
