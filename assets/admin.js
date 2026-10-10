@@ -512,11 +512,16 @@ function route() {
   const [p, arg] = h.split("/");
   const tab = p === "sinav" ? "sinavlar" : p;
   $$("nav.tabs a").forEach(a => a.classList.toggle("active", a.dataset.tab === tab));
-  const views = { sahacalisma: () => vField("manage"), beceri: vFieldHeatmap, duellosoru: vDuelQuestions, duelloodul: vDuelRewards, belgeler: vBelgeler, gecmis: vIslemGecmisi, genel: vGenel, kullanicilar: vKullanicilar, hekimler: vHekimler, urunler: vUrunler, sinavlar: vSinavlar, mufredat: vMufredat, saha: vSaha, duyurular: vDuyurular, sinav: () => vSinavEdit(arg) };
+  const views = { itirazlar: vItirazlar, yanetki: vYanEtkiAdmin, sahacalisma: () => vField("manage"), beceri: vFieldHeatmap, duellosoru: vDuelQuestions, duelloodul: vDuelRewards, belgeler: vBelgeler, gecmis: vIslemGecmisi, genel: vGenel, kullanicilar: vKullanicilar, hekimler: vHekimler, urunler: vUrunler, sinavlar: vSinavlar, mufredat: vMufredat, saha: vSaha, duyurular: vDuyurular, sinav: () => vSinavEdit(arg) };
   (views[p] || vGenel)();
 }
 window.addEventListener("hashchange", () => { if (ME && ME.role === "admin") { route(); window.scrollTo(0, 0); } });
-boot(async () => { await loadAll(); $("nav.tabs").hidden = false; route(); }, { adminOnly: true });
+boot(async () => {
+  await loadAll(); $("nav.tabs").hidden = false; route();
+  // Tıbbi birimin gözden kaçırmaması için yeni yan etki bildirimi sayısı menüde görünür.
+  const pv = await sb.from("pv_reports").select("id").eq("status", "new");
+  const n = pv.data?.length || 0, b = $("#pvBadge"); if (b && n) { b.hidden = false; b.textContent = n; }
+}, { adminOnly: true });
 
 
 

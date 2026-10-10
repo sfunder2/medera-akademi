@@ -146,14 +146,33 @@
       { id: "q1", category: "Ürün bilgisi", question: "Onkavia hangi sıklıkla uygulanır?", options: ["3 haftada bir", "Her gün", "Haftada iki kez", "Ayda bir"], answer: 0, status: "approved", source_note: "Onkavia KÜB s.1" },
       { id: "q2", category: "İlaç bilgisi", question: "Hemaris nasıl alınmalıdır?", options: ["Aç karnına", "Yemekle birlikte", "Yalnızca akşam", "Haftada bir"], answer: 0, status: "in_review", source_note: "Hemaris KÜB s.1" }
     ],
-    duel_reward_rules: [], duel_rewards: []
+    duel_reward_rules: [], duel_rewards: [],
+    field_objections: demoObjections(),
+    pv_reports: [
+      { id: "pv1", report_no: "PV-2026-00041", reporter_id: PEOPLE.pjp.id, product_id: "p-onk", event: "Hekim, ikinci infüzyondan yaklaşık bir saat sonra bir hastada yaygın kaşıntılı döküntü geliştiğini, tedaviye ara verildiğini söyledi.", serious: "hayir", source: "hekim", hcp_id: "h1", patient_age: "45-64", patient_sex: "kadin", aware_at: iso(-3), status: "in_review", unit_note: "Tıbbi birim hekimle iletişime geçti; takip bilgisi bekleniyor.", created_at: iso(-3) },
+      { id: "pv2", report_no: "PV-2026-00027", reporter_id: PEOPLE.pjp.id, product_id: "p-hem", event: "Eczacı, bir hastanın tedavinin ilk haftasında bulantı yaşadığını iletti.", serious: "hayir", source: "eczaci", hcp_id: null, patient_age: "65+", patient_sex: "erkek", aware_at: iso(-24), status: "closed", unit_note: "Bildirim değerlendirildi ve kayda alındı. Teşekkürler.", created_at: iso(-24) }
+    ]
   };
+  // Son 5 haftaya yayılmış itiraz kayıtları; son haftada Ege'de rakip ürün itirazlarında belirgin bir artış var.
+  function demoObjections() {
+    const rows = [], add = (d, region, tag, product_id, competitor = null) => rows.push({ id: uid("ob"), user_id: "u-team", product_id, tag, competitor, region, created_at: iso(-d - 0.3) });
+    // [bölge, etiket, ürün, sıklık]: sıklık küçüldükçe kayıt artar; hiçbiri tek başına dalga eşiğini geçmez.
+    const base = [["Marmara", "fiyat", "p-onk", 2], ["Marmara", "yan_etki", "p-onk", 4], ["İç Anadolu", "erisim", "p-hem", 3], ["Ege", "uygulama", "p-onk", 6],
+      ["Akdeniz", "kanit", "p-hem", 5], ["Karadeniz", "fiyat", "p-hem", 7], ["Marmara", "etkinlik", "p-hem", 5], ["İç Anadolu", "yan_etki", "p-onk", 8],
+      ["Güneydoğu Anadolu", "erisim", "p-onk", 9], ["Doğu Anadolu", "fiyat", "p-onk", 11], ["Akdeniz", "fiyat", "p-onk", 4], ["Ege", "fiyat", "p-hem", 6],
+      ["Karadeniz", "yan_etki", "p-onk", 10], ["İç Anadolu", "kanit", "p-onk", 12]];
+    for (let d = 1; d < 35; d += 1) base.forEach(([g, t, p, every], i) => { if ((d + i) % every === 0) add(d, g, t, p); });
+    [1, 1, 2, 2, 3, 3, 4, 5, 6].forEach((d, i) => add(d, "Ege", i % 3 ? "rakip" : "etkinlik", "p-onk", i % 3 ? "Velcora" : null));
+    [9, 23].forEach(d => add(d, "Ege", "rakip", "p-onk", "Velcora"));
+    [2, 6, 12, 19, 27].forEach(d => add(d, "Marmara", "rakip", "p-hem", "Lumetrin"));
+    return rows;
+  }
   const prodOf = id => products.find(p => p.id === id);
   const examOf = id => exams.find(e => e.id === id);
   // Seçilen alanlarda ürün adını ekleyen basit "join".
   const withJoins = (table, row) => {
     if (table === "user_products") return { ...row, products: prodOf(row.product_id) };
-    if (["curricula", "interactions", "source_documents"].includes(table)) return { ...row, products: row.product_id ? { name: prodOf(row.product_id)?.name } : null };
+    if (["curricula", "interactions", "source_documents", "pv_reports"].includes(table)) return { ...row, products: row.product_id ? { name: prodOf(row.product_id)?.name } : null };
     return row;
   };
 
@@ -186,6 +205,7 @@
         const list = (Array.isArray(payload) ? payload : [payload]).map(v => ({ id: uid(table), created_at: new Date().toISOString(), ...v }));
         rows().push(...list); data = list;
         if (table === "exam_assignments") list.forEach(a => { a.status = a.status || "pending"; });
+        if (table === "pv_reports") list.forEach(r => Object.assign(r, { report_no: "PV-2026-" + String(++seq).padStart(5, "0"), status: "new" }));
       } else if (op === "update") {
         data = rows().filter(match); data.forEach(r => Object.assign(r, payload));
       } else if (op === "delete") {
@@ -328,7 +348,26 @@
     duel_respond: ({ p_duel, p_accept }) => { const g = duel.games.find(x => x.id === p_duel); g.status = p_accept ? "active" : "declined"; return true; },
     duel_next: ({ p_duel }) => duelState(p_duel),
     duel_answer: ({ p_duel, p_option }) => { const s = duelPlay[p_duel]; s.answers.push(p_option); return duelState(p_duel); },
-    duel_review_question: () => true, duel_reward_decide: () => true
+    duel_review_question: () => true, duel_reward_decide: () => true,
+    // Sunucudaki objection_heatmap ile aynı kural: son 7 günde en az 5 kayıt ve önceki 4 haftanın haftalık ortalamasının 2 katı.
+    objection_heatmap: ({ p_days = 30, p_product = null } = {}) => {
+      const scope = ME_DEMO.job_role === "urun_muduru" ? myProducts : null, t = Date.now();
+      const rows = DB.field_objections.filter(o => (!scope || scope.includes(o.product_id)) && (!p_product || o.product_id === p_product));
+      const recent = rows.filter(o => t - new Date(o.created_at) < p_days * day);
+      const count = (list, key) => Object.values(list.reduce((m, o) => { const k = key(o); (m[k] = m[k] || { o, n: 0 }).n++; return m; }, {}));
+      const trend = count(rows.filter(o => t - new Date(o.created_at) < 35 * day), o => [o.region, o.tag, o.competitor || ""].join("|")).map(({ o }) => {
+        const same = rows.filter(x => x.region === o.region && x.tag === o.tag && (x.competitor || "") === (o.competitor || "") && t - new Date(x.created_at) < 35 * day);
+        const cur = same.filter(x => t - new Date(x.created_at) < 7 * day).length;
+        return { region: o.region, tag: o.tag, competitor: o.competitor, current: cur, baseline: Math.round((same.length - cur) / 4 * 10) / 10 };
+      });
+      return {
+        days: p_days, total: recent.length,
+        cells: count(recent, o => o.region + "|" + o.tag).map(({ o, n }) => ({ region: o.region, tag: o.tag, count: n })),
+        competitors: count(recent.filter(o => o.competitor), o => o.competitor).map(({ o, n }) => ({ name: o.competitor, count: n })).sort((a, b) => b.count - a.count),
+        alerts: trend.filter(a => a.current >= 5 && a.current >= 2 * Math.max(a.baseline, 1)).sort((a, b) => b.current / Math.max(b.baseline, 1) - a.current / Math.max(a.baseline, 1))
+      };
+    },
+    pv_update: ({ p_id, p_status, p_note }) => { Object.assign(DB.pv_reports.find(r => r.id === p_id), { status: p_status, unit_note: p_note || null }); return null; }
   };
   function duelState(id) {
     const s = duelPlay[id] = duelPlay[id] || { answers: [] }, i = s.answers.length;

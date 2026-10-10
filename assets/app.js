@@ -58,6 +58,7 @@ function vPortal() {
   const last = qolRead("lastPage");
   if (last && /^#\/(sinav\/[a-zA-Z0-9-]+|mufredat|roleplay|sahacalisma|gelisim)$/.test(last)) items.push(todoRow(last, icon.pulse, "Kaldığınız yerden devam edin", "Son çalışmanız"));
   if (r === "pjp") items.push(todoRow("#/roleplay", icon.user, "Hekim görüşmesi pratiği", "Yaklaşık 5 dakika"));
+  if (r === "pjp") items.unshift(todoRow("#/portal", icon.pulse, "Ziyaret kaydet", "Karşılaştığınız itirazları etiketleyin").replace('class="todo"', 'class="todo" id="logVisit"'));
   app.innerHTML = `
   <div class="page-head"><div class="grow"><h1>Merhaba${ME.full_name ? ", " + esc(ME.full_name.split(" ")[0]) : ""}</h1></div></div>
   <div class="hero"><div class="grow"><p class="small hero-k">Sıradaki adım</p><h2>${hero.t}</h2><p>${hero.d}</p></div><a class="btn" href="${hero.href}">${hero.b}</a></div>
@@ -68,13 +69,17 @@ function vPortal() {
       <p class="muted small">${fmtDate(a.created_at)}</p>${a.body ? `<p>${esc(a.body)}</p>` : ""}</div>`).join("")}</div>` : ""}`;
   // Tekrar soruları ve ürün değişiklikleri sunucudan gelir; gelmezse liste olduğu gibi kalır.
   const box = $("#todos");
-  Promise.allSettled([sb.rpc("learning_plan"), sb.rpc("field_notifications")]).then(([lp, fn]) => {
+  const visit = $("#logVisit"); if (visit) visit.onclick = e => { e.preventDefault(); interactionDialog(); };
+  const watchesObjections = r === "urun_muduru" || ME.role === "admin";
+  Promise.allSettled([sb.rpc("learning_plan"), sb.rpc("field_notifications"), watchesObjections ? sb.rpc("objection_heatmap", { p_days: 30 }) : Promise.resolve({ data: null })]).then(([lp, fn, oh]) => {
     if (!box.isConnected) return;
     const extra = [];
     const plan = lp.status === "fulfilled" && !lp.value.error ? lp.value.data || [] : [];
     if (plan.length) extra.push(todoRow("#/ogrenme", icon.search, `${plan.length} yanlış soruyu tekrar edin`, "Tekrar soruları"));
     const notes = fn.status === "fulfilled" && !fn.value.error ? (fn.value.data || []).filter(n => !n.read_at) : [];
     if (notes.length) extra.push(todoRow("#/degisiklik", icon.folder, `${notes.length} ürün değişikliğini okuyun`, esc(notes[0].title), "amber"));
+    const alerts = oh.status === "fulfilled" && oh.value.data ? oh.value.data.alerts || [] : [];
+    alerts.slice(0, 2).forEach(a => extra.unshift(todoRow("#/itirazlar", icon.pulse, "İtiraz dalgası: " + esc(a.region), esc(objectionAlertText(a)), "amber")));
     box.insertAdjacentHTML("afterbegin", extra.join(""));
     if (!box.children.length) box.innerHTML = `<p class="muted todo-empty">Bugün için başka iş yok. İyi çalışmalar!</p>`;
   });
@@ -132,6 +137,7 @@ function vBen() {
     r === "avukat" ? link("#/inceleme", "Hukuk incelemesi", badge(D.reviewCount)) : "",
     r === "avukat" ? link("#/duellosoru", "Yarışma soruları") : "",
     r === "urun_muduru" ? link("#/ekip", "Ekip raporu") + link("#/beceri", "Beceri haritası") : "",
+    r === "urun_muduru" || ME.role === "admin" ? link("#/itirazlar", "Saha itirazları") : "",
     fieldManager() || fieldReviewer() ? link("#/atolye", "İçerik atölyesi") : ""
   ].join("");
   app.innerHTML = `
@@ -147,6 +153,7 @@ function vBen() {
   <div class="menu">
     ${r === "pjp" ? link("#/paydaslar", "Hekimlerim", `<small>${D.hcps.length} kayıt</small>`) : ""}
     ${link("#/masam", "Notlarım ve favorilerim")}
+    ${link("#/yanetki", "Yan etki bildirimlerim")}
     ${link("#/degisiklik", "Ürün değişiklikleri")}
     ${link("#/profil", "Profil ve şifre")}
     ${ME.role === "admin" ? link("admin.html", "Yönetim paneli") : ""}
@@ -419,17 +426,22 @@ function pHekim() {
 }
 function interactionDialog(hcpId) {
   if (!D.hcps.length) { toast("Önce bir hekim ekleyin"); return; }
-  const d = dialog(`<h2>Etkileşim ekle</h2>
+  const d = dialog(`<h2>Ziyaret kaydet</h2>
     <div class="field"><label for="ih">Hekim</label><select id="ih">${D.hcps.map(h => `<option value="${h.id}" ${h.id === hcpId ? "selected" : ""}>${esc(h.name)}</option>`).join("")}</select></div>
     <div class="field"><label for="it">Tür</label><select id="it">${INTERACTION_TYPES.map(t => `<option>${t}</option>`).join("")}</select></div>
     <div class="field"><label for="ip">Konuşulan ürün</label><select id="ip"><option value="">—</option>${D.products.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></div>
     <div class="field"><label for="idt">Tarih</label><input type="date" id="idt" value="${new Date().toISOString().slice(0, 10)}"></div>
+    ${objectionFields()}
     <div class="field"><label for="inn">Notlar</label><textarea id="inn" placeholder="Hasta bilgisi yazmayın."></textarea></div>
-    <div class="row end"><button class="btn ghost" id="ix">Vazgeç</button><button class="btn" id="isv">Etkileşimi kaydet</button></div>`);
+    <p class="muted small" style="margin-bottom:12px">Yan etki duyduysanız ayrıca "Yan etki bildir" düğmesini kullanın.</p>
+    <div class="row end"><button class="btn ghost" id="ix">Vazgeç</button><button class="btn" id="isv">Ziyareti kaydet</button></div>`);
+  bindObjectionFields(d);
   $("#ix", d).onclick = () => d.remove();
   $("#isv", d).onclick = async () => {
-    check(await sb.from("interactions").insert({ owner_id: ME.id, hcp_id: $("#ih", d).value, type: $("#it", d).value, product_id: $("#ip", d).value || null, date: $("#idt", d).value || null, notes: $("#inn", d).value.trim() }));
-    d.remove(); toast("Etkileşim kaydedildi"); await loadAll(); vPaydaslar();
+    const hcp = D.hcps.find(h => h.id === $("#ih", d).value), productId = $("#ip", d).value || null;
+    const saved = check(await sb.from("interactions").insert({ owner_id: ME.id, hcp_id: $("#ih", d).value, type: $("#it", d).value, product_id: $("#ip", d).value || null, date: $("#idt", d).value || null, notes: $("#inn", d).value.trim() }).select().single());
+    await saveObjections(d, { interactionId: saved?.id, hcp, productId });
+    d.remove(); toast("Ziyaret kaydedildi"); await loadAll(); if (location.hash.startsWith("#/paydaslar")) vPaydaslar(); else route();
   };
 }
 function pEtk() {
@@ -588,6 +600,8 @@ function pageTabs() {
   if (r === "avukat") Object.assign(m, { inceleme: "ben", duellosoru: "ben" });
   if (r === "urun_muduru") Object.assign(m, { ekip: "ben", beceri: "ben" });
   if (fieldManager() || fieldReviewer()) m.atolye = "ben";
+  if (r === "urun_muduru" || ME.role === "admin") m.itirazlar = "ben";
+  m.yanetki = "ben";
   return m;
 }
 function route() {
@@ -601,7 +615,8 @@ function route() {
   const links = TABS.map(([k, l, ic]) => `<a href="#/${k}" class="${k === tab ? "active" : ""}"${k === tab ? ' aria-current="page"' : ""}>${ic}<span>${l}</span>${k === "ben" ? badge : ""}</a>`).join("");
   $("#nav").innerHTML = links;
   const bar = $("#tabbar"); if (bar) bar.innerHTML = links;
-  const views = { masam: vTools, yanlislar: vMistakes, sahacalisma: vField, gelisim: () => vField("plan"), degisiklik: vFieldNotices, atolye: () => vField("manage"), beceri: vFieldHeatmap, duello: vDuello, duellosoru: vDuelQuestions, ogrenme: vOgrenme, belgeler: vBelgeler, portal: vPortal, ogren: vOgren, pratik: vPratik, ben: vBen, egitim: vEgitim, kutuphane: vKutuphane, mufredat: vMufredat, paydaslar: vPaydaslar, ekip: vEkip, inceleme: vInceleme, profil: vProfil, roleplay: vRoleplay, sinav: () => vSinav(arg) };
+  const pv = $("#pvBtn"); if (pv) { pv.hidden = false; pv.onclick = pvDialog; }
+  const views = { masam: vTools, yanlislar: vMistakes, sahacalisma: vField, gelisim: () => vField("plan"), degisiklik: vFieldNotices, atolye: () => vField("manage"), beceri: vFieldHeatmap, duello: vDuello, duellosoru: vDuelQuestions, ogrenme: vOgrenme, belgeler: vBelgeler, portal: vPortal, ogren: vOgren, pratik: vPratik, ben: vBen, egitim: vEgitim, kutuphane: vKutuphane, mufredat: vMufredat, paydaslar: vPaydaslar, ekip: vEkip, inceleme: vInceleme, profil: vProfil, roleplay: vRoleplay, itirazlar: vItirazlar, yanetki: vYanEtkilerim, sinav: () => vSinav(arg) };
   const hub = TABS.some(t => t[0] === page);
   // Alt sayfalarda, ait olduğu sekmeye dönen tek bir geri bağlantısı (sınav sayfasının kendi bağlantısı var).
   const back = $("#backLink");
