@@ -45,7 +45,8 @@ async function documentDialog(doc={}) {
  <div class="field"><label>Ürün</label><select id="docProduct"><option value="">Genel belge</option>${products.map(p=>`<option value="${p.id}" ${doc.product_id===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select></div>
  <div class="field"><label>Orijinal belge adresi (isteğe bağlı)</label><input id="docUrl" type="url" value="${esc(doc.source_url)}"></div>
  <p class="muted small">Belgedeki metni sayfa sayfa ekleyin; orijinal sayfa numaralarını koruyun. TXT içeriğini de bir sayfaya aktarabilirsiniz.</p>
- <div class="field"><label>Metin dosyası (.txt)</label><input type="file" accept=".txt,text/plain" id="docFile"></div>
+ <div class="grid2"><div class="field"><label>PDF dosyası</label><input type="file" accept="application/pdf,.pdf" id="docPdf"><p class="hint" id="docPdfMsg">Sayfa numaraları korunur. Taranmış (resim) sayfalar metin içermez.</p></div>
+ <div class="field"><label>Metin dosyası (.txt)</label><input type="file" accept=".txt,text/plain" id="docFile"></div></div>
  <div id="docPages"></div><button class="btn ghost" id="addDocPage">Sayfa ekle</button>
  <div class="row end" style="margin-top:14px"><button class="btn ghost" id="cancelDoc">Vazgeç</button><button class="btn" id="saveDoc">Taslağı kaydet</button></div>`,{wide:true});
  function render(){ $('#docPages',box).innerHTML=pages.map((p,i)=>`<div class="qedit"><div class="field"><label>Orijinal sayfa numarası</label><input type="number" min="1" data-pnum="${i}" value="${p.page}"></div><div class="field"><label>Sayfa metni</label><textarea rows="6" maxlength="12000" data-ptext="${i}">${esc(p.text)}</textarea></div><button class="btn danger sm" data-prm="${i}">Sayfayı kaldır</button></div>`).join('');
@@ -54,6 +55,9 @@ async function documentDialog(doc={}) {
  $$('[data-prm]',box).forEach(x=>x.onclick=()=>{pages.splice(+x.dataset.prm,1);render();}); }
  render(); $('#addDocPage',box).onclick=()=>{pages.push({page:Math.max(0,...pages.map(p=>p.page))+1,text:''});render();};
  $('#docFile',box).onchange=async e=>{const f=e.target.files[0];if(!f)return;if(f.size>12000)return toast('Tek sayfa için dosya en fazla 12 KB olmalı; büyük metni sayfalara bölün.');pages.push({page:Math.max(0,...pages.map(p=>p.page))+1,text:await f.text()});if(pages[0]?.text==='')pages.shift();render();};
+ $('#docPdf',box).onchange=async e=>{const f=e.target.files[0];if(!f||typeof pdfPages!=='function')return;const msg=$('#docPdfMsg',box);msg.textContent='PDF okunuyor…';
+  try{const r=await pdfPages(f);if(!r.pages.length){msg.textContent='Bu PDF metin içermiyor (taranmış olabilir). Metni elle ekleyin.';return;}pages.splice(0,pages.length,...r.pages);if(!$('#docTitle',box).value.trim())$('#docTitle',box).value=f.name.replace(/\.pdf$/i,'');render();msg.textContent=`${r.pages.length} sayfa okundu`+(r.pages.length<r.total?` (${r.total-r.pages.length} sayfada metin yok)`:'')+'. Kontrol edip kaydedin.';}
+  catch(err){msg.textContent=err.message||'PDF okunamadı';}};
  $('#cancelDoc',box).onclick=()=>box.remove();
  $('#saveDoc',box).onclick=async()=>{
  const title=$('#docTitle',box).value.trim(),url=$('#docUrl',box).value.trim();

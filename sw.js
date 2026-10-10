@@ -1,8 +1,8 @@
 /* Uygulama kabuğu önbelleği. Veriler (Supabase) offline.js tarafından cihazda ayrıca saklanır. */
-const CACHE = "medera-v4";
+const CACHE = "medera-v5";
 const SHELL = ["./", "index.html", "admin.html", "config.js", "manifest.webmanifest",
   "assets/style.css", "assets/qol.css", "assets/shared.js", "assets/offline.js", "assets/features.js", "assets/duels.js",
-  "assets/roleplay.js", "assets/field-training.js", "assets/signals.js", "assets/qol.js", "assets/app.js", "assets/admin.js",
+  "assets/roleplay.js", "assets/field-training.js", "assets/micro.js", "assets/signals.js", "assets/qol.js", "assets/app.js", "assets/admin.js",
   "icons/icon-192.png", "icons/icon-512.png"];
 // Uygulamanın açılması için gereken dış dosyalar; internetsiz ilk açılışta da hazır olmalı.
 const VENDOR = ["https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3"];

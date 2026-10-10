@@ -191,6 +191,21 @@ Uygulama dört sekmeden oluşur; telefonda alt menüde, bilgisayarda üstte gör
 | **Pratik** | Sınavlar, hekim görüşmesi, bilgi yarışması (Düello), yanlışlarım, tekrar soruları, saha senaryoları |
 | **Ben** | İlerleme, hekimlerim, rol görevleri (hukuk incelemesi, ekip raporu, içerik atölyesi), notlar ve favoriler, profil, tema, çıkış |
 
+### Hekim görüşmesi: personalar ve ısınma turu
+
+- Altı hekim personası vardır: kuşkucu, analitik/akademisyen, zamanı olmayan poliklinik hekimi, yeniliğe şüpheci pratisyen, rakip ürünü tercih eden ve zamanı kısıtlı hekim. Hekim uygun yerde kanıt yeterliliği, SGK geri ödemesi ve maliyet itirazları da getirir.
+- **2 dakikalık ısınma:** Tek dokunuşla başlayan 3 yanıtlık kısa tur. Süre dolunca görüşme kendiliğinden değerlendirilir.
+- Raporun sonunda **"İçeri girmeden önce"** bölümü, en zayıf konuyu (ör. güvenlilik, geri ödeme) yazar ve onaylı ürün belgesinde o konuya en uygun sayfaya bağlantı verir.
+
+### Yayından mikro eğitim üretme
+
+1. Yeni yayını (İngilizce olabilir) yönetim panelinde **Kaynak belgeleri → Belge ekle** ile PDF olarak yükleyin. Metin sayfa numaralarıyla otomatik çıkarılır. Taranmış (resim) PDF'lerde metin olmaz; metni elle eklemek gerekir. Belgeyi hukuk onayına gönderin.
+2. Belge onaylanınca **İçerik atölyesi → Yayından mikro eğitim üret** ile ürünü ve belgeyi seçin. Yapay zekâ belgenin tamamını (yaklaşık 100 sayfaya kadar) okuyup Türkçe olarak şunları hazırlar: 3 dakikalık sesli özet metni, 3 bilgi kartı ve 5 soruluk test. Her kart ve soru dayandığı sayfayı gösterir.
+3. Taslağı kontrol edip düzenleyin ve **onaya gönderin**. İçerik, diğer saha içerikleriyle aynı inceleme akışından geçer ve onaylanmadan yayınlanmaz.
+4. Onaylanınca temsilcilerin **Bugün** listesinde "Yeni mikro eğitim" olarak görünür. Sesli özet telefonun Türkçe sesiyle dinlenir; test puanı sunucuda hesaplanır.
+
+Veritabanı değişikliği gerekmez. Telefona anlık bildirim (push) gönderimi bu sürümde yoktur; yeni içerik uygulama açıldığında Bugün listesinde görünür.
+
 ### Saha itirazları ve yan etki bildirimi
 
 Mevcut veritabanına `supabase/field_signals_v7.sql` dosyasını SQL Editor'de bir kez çalıştırın (tekrar çalıştırılabilir).
