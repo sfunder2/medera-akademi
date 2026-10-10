@@ -72,13 +72,17 @@ function vPortal() {
   const box = $("#todos");
   const visit = $("#logVisit"); if (visit) visit.onclick = e => { e.preventDefault(); interactionDialog(); };
   const watchesObjections = r === "urun_muduru" || ME.role === "admin";
-  Promise.allSettled([sb.rpc("learning_plan"), sb.rpc("field_notifications"), watchesObjections ? sb.rpc("objection_heatmap", { p_days: 30 }) : Promise.resolve({ data: null }), sb.rpc("field_list"), sb.rpc("field_history")]).then(([lp, fn, oh, fl, fh]) => {
+  Promise.allSettled([sb.rpc("learning_plan"), sb.rpc("field_notifications"), watchesObjections ? sb.rpc("objection_heatmap", { p_days: 30 }) : Promise.resolve({ data: null }), sb.rpc("field_list"), sb.rpc("field_history"), r === "pjp" ? sb.rpc("case_room_list") : Promise.resolve({ data: null })]).then(([lp, fn, oh, fl, fh, cr]) => {
     if (!box.isConnected) return;
     const extra = [];
     const plan = lp.status === "fulfilled" && !lp.value.error ? lp.value.data || [] : [];
     if (plan.length) extra.push(todoRow("#/ogrenme", icon.search, `${plan.length} yanlış soruyu tekrar edin`, "Tekrar soruları"));
     const notes = fn.status === "fulfilled" && !fn.value.error ? (fn.value.data || []).filter(n => !n.read_at) : [];
     if (notes.length) extra.push(todoRow("#/degisiklik", icon.folder, `${notes.length} ürün değişikliğini okuyun`, esc(notes[0].title), "amber"));
+    // Devam eden vaka odası: katılımcı bekleyen, süren veya puanınızı bekleyen oda.
+    const rooms = cr.status === "fulfilled" && cr.value.data ? cr.value.data.mine || [] : [];
+    rooms.filter(x => ["waiting", "live", "rating"].includes(x.status)).slice(0, 2).forEach(x => extra.push(todoRow("#/oda/" + x.id, icon.user,
+      x.status === "rating" ? "Vaka odası: puanlama bekliyor" : "Vaka odanız devam ediyor", (CASE_SCENARIOS[x.scenario]?.title || "") + " · kod " + esc(x.code))));
     // Onaylanmış ve henüz çalışılmamış mikro eğitimler.
     const ok = r => r.status === "fulfilled" && !r.value.error ? r.value.data || [] : [];
     const done = ok(fh), micro = ok(fl).filter(u => u.kind === "update" && u.payload?.podcast && !done.some(h => h.unit_id === u.id && h.version === u.version)).slice(0, 2);
@@ -124,6 +128,7 @@ function vPratik() {
   const tiles = [
     tile("#/egitim", icon.book, "Sınavlar", pending ? `${pending} bekleyen` : "Pratik sınavı oluşturun"),
     r === "pjp" ? tile("#/roleplay", icon.user, "Hekim görüşmesi", "Sesli veya yazılı pratik") : "",
+    r === "pjp" ? tile("#/vaka", icon.user, "Vaka odası", "Meslektaşlarla canlı vaka") : "",
     r === "pjp" ? tile("#/duello", icon.pulse, "Bilgi yarışması", "Bir meslektaşınızla") : "",
     tile("#/yanlislar", icon.search, "Yanlışlarım", "Hatalı cevaplar ve doğruları"),
     tile("#/ogrenme", icon.folder, "Tekrar soruları", "Eksik konularınıza göre"),
@@ -612,7 +617,7 @@ function pageTabs() {
     pratik: "pratik", egitim: "pratik", sinav: "pratik", yanlislar: "pratik", ogrenme: "pratik", sahacalisma: "pratik", gelisim: "pratik",
     ben: "ben", profil: "ben", masam: "ben"
   };
-  if (r === "pjp") Object.assign(m, { roleplay: "pratik", duello: "pratik", paydaslar: "ben" });
+  if (r === "pjp") Object.assign(m, { roleplay: "pratik", duello: "pratik", vaka: "pratik", oda: "pratik", paydaslar: "ben" });
   if (r === "avukat") Object.assign(m, { inceleme: "ben", duellosoru: "ben" });
   if (r === "urun_muduru") Object.assign(m, { ekip: "ben", beceri: "ben" });
   if (fieldManager() || fieldReviewer()) m.atolye = "ben";
@@ -632,7 +637,7 @@ function route() {
   $("#nav").innerHTML = links;
   const bar = $("#tabbar"); if (bar) bar.innerHTML = links;
   const pv = $("#pvBtn"); if (pv) { pv.hidden = false; pv.onclick = pvDialog; }
-  const views = { masam: vTools, yanlislar: vMistakes, sahacalisma: vField, gelisim: () => vField("plan"), degisiklik: vFieldNotices, atolye: () => vField("manage"), beceri: vFieldHeatmap, duello: vDuello, duellosoru: vDuelQuestions, ogrenme: vOgrenme, belgeler: vBelgeler, portal: vPortal, ogren: vOgren, pratik: vPratik, ben: vBen, egitim: vEgitim, kutuphane: vKutuphane, mufredat: vMufredat, paydaslar: vPaydaslar, ekip: vEkip, inceleme: vInceleme, profil: vProfil, roleplay: vRoleplay, itirazlar: vItirazlar, yanetki: vYanEtkilerim, sinav: () => vSinav(arg) };
+  const views = { masam: vTools, yanlislar: vMistakes, sahacalisma: vField, gelisim: () => vField("plan"), degisiklik: vFieldNotices, atolye: () => vField("manage"), beceri: vFieldHeatmap, duello: vDuello, duellosoru: vDuelQuestions, ogrenme: vOgrenme, belgeler: vBelgeler, portal: vPortal, ogren: vOgren, pratik: vPratik, ben: vBen, egitim: vEgitim, kutuphane: vKutuphane, mufredat: vMufredat, paydaslar: vPaydaslar, ekip: vEkip, inceleme: vInceleme, profil: vProfil, roleplay: vRoleplay, itirazlar: vItirazlar, yanetki: vYanEtkilerim, vaka: vVaka, oda: () => vOda(arg), sinav: () => vSinav(arg) };
   const hub = TABS.some(t => t[0] === page);
   // Alt sayfalarda, ait olduğu sekmeye dönen tek bir geri bağlantısı (sınav sayfasının kendi bağlantısı var).
   const back = $("#backLink");

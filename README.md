@@ -206,6 +206,17 @@ Uygulama dört sekmeden oluşur; telefonda alt menüde, bilgisayarda üstte gör
 
 Veritabanı değişikliği gerekmez. Telefona anlık bildirim (push) gönderimi bu sürümde yoktur; yeni içerik uygulama açıldığında Bugün listesinde görünür.
 
+### Sanal vaka odaları
+
+Mevcut veritabanına `supabase/case_rooms_v8.sql` dosyasını SQL Editor'de bir kez çalıştırın (duels_v4.sql'den sonra; tekrar çalıştırılabilir).
+
+- **Oda:** PJP'ler Pratik → Vaka odası'ndan vaka (kanıt isteyen akademisyen, rakip ürünü tercih eden hekim, zamanı olmayan poliklinik hekimi, geri ödeme kaygısı) ve isteğe bağlı ürün seçip oda kurar. 6 haneli kod paylaşılır ya da oda "Açık odalar" listesinden bulunur. Oda 2-3 kişiliktir.
+- **Roller:** Başlatınca sistem rolleri rastgele dağıtır: mümessil, hekim ve (üçüncü kişi varsa) gözlemci. Her rol kendi brifingini görür; hekim kullanabileceği itirazları, gözlemci puanlama ölçütlerini görür.
+- **Görüşme:** Hekim başlar; hekim ve mümessil sırayla yazarak veya mikrofonla konuşur. Görüşme mümessilin 5. yanıtında, 15 dakika dolunca ya da hekim/odayı kuran kişi bitirince puanlamaya geçer. Sıra ve süre kuralları sunucuda uygulanır.
+- **Puanlama:** Hekim ve gözlemci mümessili dört ölçütle (bilimsel doğruluk ve kanıt, itiraz karşılama, dengeli anlatım, kapanış) 1-5 arası puanlar. Puanlar herkes puanlayınca açıklanır. Mümessil puanların ortalamasını, puanlayanlar 20 katılım puanı alır. Yapay zekâ ayrıca koçluk geri bildirimi yazar; bu puana katılmaz.
+- **Sıralama:** Vaka odası sayfasında aylık bireysel ve bölge sıralaması vardır. Bölge, Bilgi yarışmasında seçilen bölgedir.
+- **Anlık güncelleme:** Ekranlar Supabase Realtime yayın kanalıyla anında, bağlantı kurulamazsa 3 saniyede bir yenilenir. Görüntülü/sesli canlı görüşme (WebRTC) bu sürümde yoktur.
+
 ### Saha itirazları ve yan etki bildirimi
 
 Mevcut veritabanına `supabase/field_signals_v7.sql` dosyasını SQL Editor'de bir kez çalıştırın (tekrar çalıştırılabilir).

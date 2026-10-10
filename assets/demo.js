@@ -299,7 +299,62 @@
   ];
   const duelPlay = {};
 
+  /* ---------- Vaka odaları: sanal meslektaşlar odaya katılır, konuşur ve puanlar ---------- */
+  const BOTS = { "u-kaan": "Kaan Tekin", "u-sena": "Sena Güneş", "u-burcu": "Burcu Yalın", "u-emre": "Emre Çelik" };
+  const botLines = {
+    doctor: ["Merhaba, kısaca anlatın; bu ilaç neden ilgimi çeksin?", "Bu sonucu hangi çalışmaya dayandırıyorsunuz, kaç hastayla?", "Peki güvenlilik tarafında ne söyleyebilirsiniz?", "SGK ödemesi ve hastanın katkı payı nasıl?", "Tamam, kaynağı e-postayla gönderin, değerlendiririm."],
+    rep: ["Teşekkürler hocam, tek cümleyle: onaylı ürün bilgisine göre üç haftada bir uygulanan bir tedavi.", "Bu bilgi kısa ürün bilgisinin birinci sayfasında; isterseniz birlikte bakalım.", "Güvenlilik için düzenli kardiyak izlem öneriliyor; ilgili bölümü paylaşabilirim.", "Geri ödeme ayrıntısını tıbbi bilgi birimimizden size iletebilirim.", "Kaynağı bugün gönderiyorum; bir sonraki ziyarette sorularınızı konuşalım."]
+  };
+  const roomsDB = [];
+  const newRoom = (creator, scenario, product_id, minutesAgo = 0) => {
+    const r = { id: uid("room"), code: Math.random().toString(36).slice(2, 8).toUpperCase().replace(/[01IO]/g, "K"), creator, product_id, scenario, status: "waiting", turn_limit: 5, created_at: iso(-minutesAgo / 1440), started_at: null, ended_at: null, members: [], messages: [], ratings: [], feedback: null };
+    roomsDB.push(r); return r;
+  };
+  const addMember = (r, user_id) => r.members.push({ user_id, name: user_id === ME_DEMO.id ? ME_DEMO.full_name : BOTS[user_id], role: null, points: 0, joined_at: new Date().toISOString() });
+  { const open = newRoom("u-burcu", "rakip", "p-hem", 4); addMember(open, "u-burcu"); addMember(open, "u-emre");
+    const old = newRoom(ME_DEMO.id, "kanit", "p-onk", 60 * 26); addMember(old, ME_DEMO.id); addMember(old, "u-kaan"); addMember(old, "u-sena");
+    Object.assign(old, { status: "done", started_at: iso(-1.05), ended_at: iso(-1.04) }); old.members[0].role = "rep"; old.members[0].points = 72; old.members[1].role = "doctor"; old.members[1].points = 20; old.members[2].role = "observer"; old.members[2].points = 20;
+    old.messages = botLines.doctor.flatMap((d, i) => [{ id: i * 2 + 1, role: "doctor", body: d, at: iso(-1.05) }, { id: i * 2 + 2, role: "rep", body: botLines.rep[i], at: iso(-1.05) }]);
+    old.ratings = [{ role: "doctor", scores: { kanit: 4, itiraz: 4, denge: 4, kapanis: 3 }, total: 69, comment: "Kaynağa yönlendirmen iyiydi." }, { role: "observer", scores: { kanit: 4, itiraz: 4, denge: 5, kapanis: 3 }, total: 75, comment: "Kapanışta somut bir tarih verebilirdin." }]; }
+  const roomTurn = r => { const last = r.messages.at(-1); return last ? (last.role === "doctor" ? "rep" : "doctor") : "doctor"; };
+  const roomFinalize = r => { if (r.members.filter(m => ["doctor", "observer"].includes(m.role)).some(m => !r.ratings.some(x => x.rater === m.user_id))) return;
+    const avg = Math.round(r.ratings.reduce((t, x) => t + x.total, 0) / r.ratings.length); r.members.forEach(m => m.points = m.role === "rep" ? avg : 20); r.status = "done"; };
+  const roomSay = (r, user_id, body) => { const m = r.members.find(x => x.user_id === user_id); r.messages.push({ id: r.messages.length + 1, role: m.role, body, at: new Date().toISOString() });
+    if (m.role === "rep" && r.messages.filter(x => x.role === "rep").length >= r.turn_limit) { r.status = "rating"; r.ended_at = new Date().toISOString(); } roomBots(r); };
+  // Sırası gelen sanal katılımcı 1,5 saniye sonra konuşur; puanlama aşamasında puan verir.
+  function roomBots(r) {
+    setTimeout(() => {
+      if (r.status === "live") { const who = r.members.find(m => m.role === roomTurn(r)); if (who && who.user_id !== ME_DEMO.id) roomSay(r, who.user_id, botLines[who.role][r.messages.filter(x => x.role === who.role).length % 5]); }
+      if (r.status === "rating") { r.members.filter(m => m.user_id !== ME_DEMO.id && ["doctor", "observer"].includes(m.role) && !r.ratings.some(x => x.rater === m.user_id)).forEach((m, i) => {
+        const sc = i ? { kanit: 3, itiraz: 4, denge: 4, kapanis: 3 } : { kanit: 4, itiraz: 4, denge: 5, kapanis: 4 };
+        r.ratings.push({ rater: m.user_id, role: m.role, scores: sc, total: Math.round((Object.values(sc).reduce((a, b) => a + b, 0) - 4) * 100 / 16), comment: i ? "İtirazları sakin karşıladın." : "Kaynağa dayanman güven verdi." }); }); roomFinalize(r); }
+    }, 1500);
+  }
+  const roomState = r => ({ room: { ...r, product: prodOf(r.product_id)?.name || null, now: new Date().toISOString(), members: undefined, messages: undefined, ratings: undefined },
+    members: r.members.map(m => ({ ...m, rated: r.ratings.some(x => x.rater === m.user_id) })), messages: r.messages,
+    ratings: r.ratings.filter(x => r.status === "done" || x.rater === ME_DEMO.id), feedback: r.feedback });
+
   const RPC = {
+    case_room_list: () => ({ open: roomsDB.filter(r => r.status === "waiting" && !r.members.some(m => m.user_id === ME_DEMO.id)).map(r => ({ id: r.id, code: r.code, scenario: r.scenario, product: prodOf(r.product_id)?.name, creator: BOTS[r.creator], members: r.members.length, created_at: r.created_at })),
+      mine: roomsDB.filter(r => r.members.some(m => m.user_id === ME_DEMO.id) && r.status !== "cancelled").map(r => { const m = r.members.find(x => x.user_id === ME_DEMO.id); return { id: r.id, code: r.code, scenario: r.scenario, status: r.status, role: m.role, points: m.points, product: prodOf(r.product_id)?.name, created_at: r.created_at }; }).reverse() }),
+    case_room_create: ({ p_product, p_scenario }) => { const r = newRoom(ME_DEMO.id, p_scenario, p_product); addMember(r, ME_DEMO.id);
+      setTimeout(() => r.status === "waiting" && addMember(r, "u-kaan"), 1500); setTimeout(() => r.status === "waiting" && addMember(r, "u-sena"), 3000); return { id: r.id, code: r.code }; },
+    case_room_join: ({ p_code }) => { const r = roomsDB.find(x => x.code === String(p_code).toUpperCase()); if (!r) throw { message: "Oda bulunamadı" };
+      if (!r.members.some(m => m.user_id === ME_DEMO.id)) addMember(r, ME_DEMO.id);
+      // Odayı kuran sanal katılımcı birkaç saniye içinde başlatır; demoda size hekim rolü düşer.
+      setTimeout(() => { if (r.status !== "waiting") return; r.members.forEach(m => m.role = m.user_id === ME_DEMO.id ? "doctor" : m.user_id === r.creator ? "rep" : "observer"); r.status = "live"; r.started_at = new Date().toISOString(); }, 2500); return r.id; },
+    case_room_leave: ({ p_room }) => { const r = roomsDB.find(x => x.id === p_room); if (r.creator === ME_DEMO.id) r.status = "cancelled"; else r.members = r.members.filter(m => m.user_id !== ME_DEMO.id); return null; },
+    case_room_start: ({ p_room }) => { const r = roomsDB.find(x => x.id === p_room); const roles = ["rep", "doctor", "observer"]; r.members.forEach((m, i) => m.role = roles[i]); r.status = "live"; r.started_at = new Date().toISOString(); roomBots(r); return null; },
+    case_room_say: ({ p_room, p_body }) => { const r = roomsDB.find(x => x.id === p_room), m = r.members.find(x => x.user_id === ME_DEMO.id);
+      if (r.status !== "live") throw { message: "Görüşme devam etmiyor" }; if (roomTurn(r) !== m.role) throw { message: "Sıra karşı tarafta" }; roomSay(r, ME_DEMO.id, p_body); return null; },
+    case_room_end: ({ p_room }) => { const r = roomsDB.find(x => x.id === p_room); r.status = r.messages.some(x => x.role === "rep") ? "rating" : "cancelled"; r.ended_at = new Date().toISOString(); roomBots(r); return null; },
+    case_room_rate: ({ p_room, p_scores, p_comment }) => { const r = roomsDB.find(x => x.id === p_room), m = r.members.find(x => x.user_id === ME_DEMO.id);
+      r.ratings.push({ rater: ME_DEMO.id, role: m.role, scores: p_scores, total: Math.round((Object.values(p_scores).reduce((a, b) => a + b, 0) - 4) * 100 / 16), comment: p_comment || null }); roomFinalize(r); roomBots(r); return null; },
+    case_room_feedback_save: ({ p_room, p_body }) => { const r = roomsDB.find(x => x.id === p_room); r.feedback = r.feedback || p_body; return null; },
+    case_room_state: ({ p_room }) => roomState(roomsDB.find(x => x.id === p_room)),
+    case_room_leaderboard: () => { const mine = roomsDB.filter(r => r.status === "done").reduce((t, r) => t + (r.members.find(m => m.user_id === ME_DEMO.id)?.points || 0), 0);
+      const people = [{ id: "u-sena", name: "Sena Güneş", region: "Ege", points: 214 }, { id: "u-kaan", name: "Kaan Tekin", region: "Marmara", points: 158 }, { id: ME_DEMO.id, name: ME_DEMO.full_name, region: "Marmara", points: mine }, { id: "u-burcu", name: "Burcu Yalın", region: "İç Anadolu", points: 96 }].sort((a, b) => b.points - a.points);
+      return { people, regions: [{ region: "Ege", average: 214, people: 1 }, { region: "Marmara", average: Math.round((158 + mine) / 2), people: 2 }, { region: "İç Anadolu", average: 96, people: 1 }] }; },
     my_assignments: () => myAssignments(),
     exam_review: ({ p_assignment }) => { const a = DB.exam_assignments.find(x => x.id === p_assignment); return DB.exam_keys.find(k => k.exam_id === a?.exam_id) || null; },
     submit_exam: ({ p_assignment, p_answers }) => {
@@ -423,6 +478,7 @@
       const qs = exams[0].questions.slice(0, 3).concat(exams[1].questions.slice(0, 2));
       return { text: JSON.stringify({ title: topic + " — pratik sınavı", questions: qs.map(q => ({ q: q.q, options: q.options, answer: 0, explanation: "Demo sınavı: doğru cevap A şıkkıdır." })) }) };
     }
+    if (sys.includes("vaka odası görüşmesidir")) return { text: "Bilimsel doğruluk ve kanıt: Mümessil iddialarını kısa ürün bilgisine dayandırdı (\"Bu bilgi kısa ürün bilgisinin birinci sayfasında\").\nİtiraz karşılama: Güvenlilik sorusunu kabul edip ilgili bölümü önerdi; geri ödeme sorusunu doğru birime yönlendirdi.\nDengeli anlatım: Abartılı ifade veya reçete baskısı yok.\nKapanış: Kaynağı gönderme sözü verdi; bir sonraki ziyaret için somut tarih önermedi.\n\nGelişim önerileri:\n1. Hekimin sorusunu önce kendi cümlenizle teyit edin.\n2. Kanıtı sayfa numarasıyla birlikte sunun.\n3. Görüşmeyi tarihli bir sonraki adımla kapatın." };
     if (sys.includes("hekim rolündesin")) return { text: doctorLines[doctorTurn++ % doctorLines.length] };
     if (sys.includes("saha eğitim koçusun")) return { text: "İtiraz karşılama: 78/100 — Hekimin güvenlilik endişesini kabul edip onaylı kaynağa yönlendirdiniz (\"ilgili bölümü birlikte inceleyebiliriz\").\nİletişim yapısı: 72/100 — Açık sorular sordunuz; görüşmeyi bir sonraki adımla kapatmayı unutmayın.\n\nGüçlü yönler:\n• Kanıta dayalı ve dengeli dil\n• Bilmediğiniz ayrıntıda tıbbi bilgi birimine yönlendirme\n\nGeliştirilecekler:\n• Karşılaştırma sorularında kanıt düzeyini netleştirin\n• Görüşme sonunda somut bir takip önerin\nZAYIF KONU: güvenlilik" };
     if (last.includes("iddialarını onaylı kaynaklara göre incele")) return { text: "Desteklenen iddialar: Kardiyak izlem önerisi (KÜB s.2).\nDoğrulanamayan iddialar: Görüşmede belirtilen izlem sıklığı onaylı kaynakta yer almıyor.", sources: [{ document_id: "d-onk", title: "Onkavia kısa ürün bilgisi", page: 2 }] };
@@ -449,7 +505,7 @@
   const session = { user: { id: ME_DEMO.id, email: ME_DEMO.email }, access_token: "demo" };
   window.supabase = { createClient: () => ({
     from: query,
-    rpc: (name, args = {}) => Promise.resolve(RPC[name] ? { data: RPC[name](args), error: null } : { data: [], error: null }),
+    rpc: (name, args = {}) => { try { return Promise.resolve(RPC[name] ? { data: RPC[name](args), error: null } : { data: [], error: null }); } catch (e) { return Promise.resolve({ data: null, error: { message: e.message || String(e) } }); } },
     auth: {
       getSession: async () => ({ data: { session } }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
